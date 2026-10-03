@@ -1,0 +1,305 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Premium, restrained product styling. */
+:root {
+  --radius: 0.9rem;
+  color-scheme: light;
+  --background: #f4f7ff;
+  --foreground: #0b1220;
+  --surface: #ffffff;
+  --surface-muted: #f8fbff;
+  --border: rgba(148, 163, 184, 0.32);
+  --input: #ffffff;
+  --ring: #1d4ed8;
+  --muted: #edf3ff;
+  --muted-foreground: #475569;
+  --primary: #1237c8;
+  --primary-foreground: #ffffff;
+}
+
+html.dark {
+  color-scheme: dark;
+  --background: #0b1220;
+  --foreground: #e7edf7;
+  --surface: #111c2d;
+  --surface-muted: #172438;
+  --border: rgba(148, 163, 184, 0.2);
+  --input: #101a2a;
+  --ring: #79a7ff;
+  --muted: #192943;
+  --muted-foreground: #a8b6ca;
+  --primary: #4f7ff2;
+  --primary-foreground: #ffffff;
+}
+
+@theme inline {
+  --font-sans: var(--font-poppins), "Segoe UI", Arial, Helvetica, sans-serif;
+  --font-serif: var(--font-poppins), "Segoe UI", Arial, Helvetica, sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --radius-sm: 0.8rem;
+  --radius-md: 1.1rem;
+  --radius-lg: 1.4rem;
+}
+
+html {
+  background: var(--background);
+}
+
+body {
+  background:
+    radial-gradient(circle at top left, rgba(37, 99, 235, 0.12), transparent 24%),
+    radial-gradient(circle at top right, rgba(59, 130, 246, 0.08), transparent 30%),
+    linear-gradient(180deg, #f8fbff 0%, #f2f6ff 100%);
+  color: var(--foreground);
+  min-height: 100vh;
+  font-feature-settings: "rlig" 1, "calt" 1;
+}
+
+html.dark body {
+  background:
+    radial-gradient(circle at 8% 0%, rgba(37, 99, 235, 0.16), transparent 25%),
+    radial-gradient(circle at 96% 8%, rgba(13, 148, 136, 0.09), transparent 28%),
+    linear-gradient(180deg, #0d1728 0%, #0b1220 58%, #0a111d 100%);
+  color: var(--foreground);
+}
+
+html.dark .bg-white,
+html.dark [class~="bg-white/80"],
+html.dark [class~="bg-white/90"],
+html.dark [class~="bg-white/95"],
+html.dark [class~="dark:bg-white"] {
+  background-color: var(--surface);
+}
+
+html.dark .bg-slate-50,
+html.dark .bg-zinc-100,
+html.dark .bg-zinc-200,
+html.dark [class~="dark:bg-zinc-900"],
+html.dark [class~="dark:bg-zinc-800"] {
+  background-color: var(--surface-muted);
+}
+
+html.dark .bg-blue-50,
+html.dark [class~="bg-blue-50/30"],
+html.dark [class~="hover:bg-blue-50"]:hover {
+  background-color: #172c4c;
+}
+
+html.dark .bg-emerald-50 {
+  background-color: #12352f;
+}
+
+html.dark .bg-amber-50 {
+  background-color: #3a2d13;
+}
+
+html.dark .bg-rose-50 {
+  background-color: #3b2029;
+}
+
+html.dark .bg-black,
+html.dark [class~="dark:bg-black"] {
+  background-color: #080e19;
+}
+
+html.dark .text-black,
+html.dark .text-slate-950,
+html.dark .text-slate-900,
+html.dark .text-slate-800,
+html.dark .text-slate-700,
+html.dark .text-zinc-900 {
+  color: #e7edf7;
+}
+
+html.dark .text-slate-600,
+html.dark .text-zinc-600 {
+  color: #b4c0d2;
+}
+
+html.dark .text-slate-500,
+html.dark .text-zinc-500 {
+  color: #94a4bb;
+}
+
+html.dark .text-blue-900,
+html.dark .text-blue-800,
+html.dark .text-blue-700 {
+  color: #a9c7ff;
+}
+
+html.dark .text-emerald-800,
+html.dark .text-emerald-700 {
+  color: #6ee7b7;
+}
+
+html.dark .text-amber-800,
+html.dark .text-amber-700 {
+  color: #fcd34d;
+}
+
+html.dark .text-rose-800,
+html.dark .text-rose-700 {
+  color: #fda4af;
+}
+
+html.dark .dark\:text-black {
+  color: #e7edf7;
+}
+
+html.dark [class~="dark:border-white"] {
+  border-color: var(--border);
+}
+
+html.dark .prose {
+  --tw-prose-body: #cbd5e1;
+  --tw-prose-headings: #f1f5f9;
+  --tw-prose-lead: #b4c0d2;
+  --tw-prose-links: #a9c7ff;
+  --tw-prose-bold: #f1f5f9;
+  --tw-prose-counters: #94a4bb;
+  --tw-prose-bullets: #64748b;
+  --tw-prose-hr: #334155;
+  --tw-prose-quotes: #e2e8f0;
+  --tw-prose-quote-borders: #475569;
+  --tw-prose-captions: #94a4bb;
+  --tw-prose-code: #e2e8f0;
+  --tw-prose-pre-code: #e2e8f0;
+  --tw-prose-pre-bg: #111c2d;
+  --tw-prose-th-borders: #475569;
+  --tw-prose-td-borders: #334155;
+}
+
+* {
+  border-color: var(--border);
+}
+
+button,
+input,
+textarea,
+select {
+  transition: all 170ms ease;
+}
+
+button {
+  border-radius: 15px;
+}
+
+::selection {
+  background: rgba(29, 78, 216, 0.18);
+}
+
+html, body {
+  scroll-behavior: smooth;
+}
+
+@keyframes page-arrive {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+main,
+.page-enter {
+  animation: page-arrive 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.course-preloader {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--background);
+  color: var(--foreground);
+  transition: opacity 240ms ease, visibility 240ms ease;
+}
+
+.course-preloader--leaving {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.course-preloader__content {
+  width: min(82vw, 34rem);
+}
+
+.course-preloader__brand {
+  display: block;
+  margin-bottom: 1rem;
+  color: var(--muted-foreground);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+}
+
+.course-preloader__title {
+  display: flex;
+  min-height: 1.3em;
+  align-items: baseline;
+  margin: 0;
+  font-size: clamp(1.35rem, 5vw, 2.5rem);
+  font-weight: 600;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.course-preloader__level {
+  color: var(--primary);
+  white-space: pre;
+}
+
+.course-preloader__cursor {
+  width: 2px;
+  height: 0.92em;
+  flex: 0 0 2px;
+  margin-left: 0.16em;
+  background: var(--primary);
+  animation: preloader-cursor 800ms steps(2, start) infinite;
+}
+
+.course-preloader__track {
+  height: 2px;
+  margin-top: 1.6rem;
+  overflow: hidden;
+  background: var(--border);
+}
+
+.course-preloader__progress {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--primary);
+  transform-origin: left;
+  transition: transform 80ms linear;
+}
+
+@keyframes preloader-cursor {
+  to {
+    visibility: hidden;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  main,
+  .page-enter {
+    animation: none;
+  }
+
+  .course-preloader__cursor {
+    animation: none;
+  }
+}
