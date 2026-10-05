@@ -24,16 +24,16 @@ function CourseList({ rows }: { rows: Row[] }) {
         <li key={c.id}>
           <Link
             href={`/courses/${c.id}`}
-            className="block px-4 py-4 transition-colors hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue-600 dark:hover:bg-slate-800"
+            className="block px-3 py-4 transition-colors hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue-600 sm:px-4 dark:hover:bg-slate-800"
           >
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex min-w-0 items-start justify-between gap-2 sm:gap-4">
               <div className="min-w-0">
-                <p className="truncate font-semibold text-slate-900 dark:text-slate-100">{c.title}</p>
-                {c.description && <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-600 dark:text-slate-300">{c.description}</p>}
+                <p className="break-words font-semibold leading-5 text-slate-900 [overflow-wrap:anywhere] dark:text-slate-100">{c.title}</p>
+                {c.description && <p className="mt-1 line-clamp-2 break-words text-sm leading-5 text-slate-600 [overflow-wrap:anywhere] dark:text-slate-300">{c.description}</p>}
               </div>
-              <span className="shrink-0 text-xs font-medium text-blue-700 dark:text-blue-300">Open</span>
+              <span className="shrink-0 pt-0.5 text-xs font-medium text-blue-700 dark:text-blue-300">Open</span>
             </div>
-            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{c.note}</p>
+            <p className="mt-2 break-words text-xs text-slate-500 [overflow-wrap:anywhere] dark:text-slate-400">{c.note}</p>
             {typeof c.completed === "number" && typeof c.total === "number" && c.total > 0 && (
               <div className="mt-3 flex items-center gap-3">
                 <div
@@ -73,15 +73,15 @@ export default async function CoursesPage({ searchParams }: { searchParams: Prom
   const initials = displayName.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "?";
   const restrictedIds = restrictions.map((restriction) => restriction.courseId);
   const [ownedCourses, catalogCourses] = await Promise.all([
-    Course.find({ ownerId: userId }).sort({ createdAt: -1 }).select("title description status chapterCount catalogVisible").lean(),
-    Course.find({ catalogVisible: true, _id: { $nin: restrictedIds } }).sort({ createdAt: -1 }).select("title description status chapterCount").lean(),
+    Course.find({ ownerId: userId, archivedAt: null }).sort({ createdAt: -1 }).select("title description status chapterCount catalogVisible").lean(),
+    Course.find({ catalogVisible: true, archivedAt: null, _id: { $nin: restrictedIds } }).sort({ createdAt: -1 }).select("title description status chapterCount").lean(),
   ]);
   const restrictedIdSet = new Set(restrictedIds.map(String));
   const owned = ownedCourses.filter((course) => !restrictedIdSet.has(String(course._id)));
   const joinedProgress = await StudentProgress.find({ userId, courseId: { $nin: restrictedIds } }).select("courseId completedChapterIds").lean();
   const joinedIds = joinedProgress.map((progress) => progress.courseId);
   const joined = joinedIds.length
-    ? await Course.find({ _id: { $in: joinedIds }, ownerId: { $ne: userId }, status: "ready" }).sort({ title: 1 }).select("title description chapterCount").lean()
+    ? await Course.find({ _id: { $in: joinedIds }, ownerId: { $ne: userId }, status: "ready", archivedAt: null }).sort({ title: 1 }).select("title description chapterCount").lean()
     : [];
   const progressByCourse = new Map(joinedProgress.map((progress) => [String(progress.courseId), progress.completedChapterIds.length]));
   const catalogIds = new Set(catalogCourses.map((course) => String(course._id)));
@@ -120,9 +120,9 @@ export default async function CoursesPage({ searchParams }: { searchParams: Prom
   return (
     <>
       <SiteHeader />
-      <main className="mx-auto max-w-6xl space-y-10 px-5 py-10 md:px-10">
-        <header className="flex flex-wrap items-center justify-between gap-5 border-b border-slate-200 pb-6 dark:border-slate-800">
-          <div className="flex min-w-0 items-center gap-4">
+      <main className="mx-auto max-w-6xl space-y-7 px-3 py-6 sm:space-y-10 sm:px-5 sm:py-10 md:px-10">
+        <header className="flex flex-col items-start justify-between gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-center sm:gap-5 sm:pb-6 dark:border-slate-800">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
             {profile?.avatarData ? (
               <img
                 src={profile.avatarData}
@@ -137,11 +137,11 @@ export default async function CoursesPage({ searchParams }: { searchParams: Prom
               </span>
             )}
             <div className="min-w-0">
-              <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-white">Your learning</h1>
-              <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Welcome back, {displayName}. Continue a course or find your next one.</p>
+              <h1 className="text-xl font-semibold tracking-tight text-slate-950 sm:text-2xl dark:text-white">Your learning</h1>
+              <p className="mt-1.5 text-sm leading-5 text-slate-600 [overflow-wrap:anywhere] sm:mt-2 dark:text-slate-300">Welcome back, {displayName}. Continue a course or find your next one.</p>
             </div>
           </div>
-          <Link href="/profile" className="text-sm font-medium text-blue-700 hover:text-blue-900 dark:text-blue-300 dark:hover:text-blue-200">
+          <Link href="/profile" className="inline-flex min-h-11 items-center text-sm font-medium text-blue-700 hover:text-blue-900 dark:text-blue-300 dark:hover:text-blue-200">
             Edit profile
           </Link>
         </header>
@@ -153,14 +153,19 @@ export default async function CoursesPage({ searchParams }: { searchParams: Prom
           </section>
         )}
 
-        <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_21rem]">
+        <div className="grid min-w-0 grid-cols-1 items-start gap-7 sm:gap-10 lg:grid-cols-[minmax(0,1fr)_21rem]">
           <section aria-labelledby="my-courses-heading">
-            <div className="mb-4 flex items-end justify-between gap-4">
-              <div>
+            <div className="mb-4 flex flex-wrap items-end justify-between gap-3 sm:gap-4">
+              <div className="min-w-0">
                 <h2 id="my-courses-heading" className="text-lg font-semibold text-slate-900 dark:text-white">My courses</h2>
                 <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Your teaching and enrolled courses in one place.</p>
               </div>
-              <span className="shrink-0 text-sm tabular-nums text-slate-500 dark:text-slate-400">{myRows.length}</span>
+              <div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:justify-end">
+                <span className="shrink-0 text-sm tabular-nums text-slate-500 dark:text-slate-400">{myRows.length}</span>
+                <Link href="/assessments" className="inline-flex min-h-11 items-center border border-blue-700 bg-blue-700 px-4 text-sm font-semibold text-white hover:bg-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">
+                  Create assessment
+                </Link>
+              </div>
             </div>
             {myRows.length === 0 ? (
               <p className="border-y border-slate-200 py-7 text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400">
@@ -169,7 +174,7 @@ export default async function CoursesPage({ searchParams }: { searchParams: Prom
             ) : <CourseList rows={myRows} />}
           </section>
 
-          <aside aria-labelledby="join-course-heading" className="border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+          <aside aria-labelledby="join-course-heading" className="min-w-0 border border-slate-200 bg-white p-4 sm:p-5 dark:border-slate-800 dark:bg-slate-900">
             <h2 id="join-course-heading" className="text-base font-semibold text-slate-900 dark:text-white">Join with a code</h2>
             <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
               Enter a course code shared by your instructor{groupCodesEnabled ? " or a group code to join several courses at once" : ""}.
@@ -180,7 +185,7 @@ export default async function CoursesPage({ searchParams }: { searchParams: Prom
             {joinNotice === "invalid" && (
               <p role="alert" className="mt-4 border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">That code is invalid, disabled, or has no courses available to join.</p>
             )}
-            <form action={joinCourseByCode} className="mt-4 space-y-3">
+            <form action={joinCourseByCode} className="mt-4 min-w-0 space-y-3">
               <label htmlFor="course-code" className="block text-sm font-medium text-slate-700 dark:text-slate-200">
                 Course or group code
                 <input
@@ -192,7 +197,7 @@ export default async function CoursesPage({ searchParams }: { searchParams: Prom
                   spellCheck={false}
                   maxLength={100}
                   required
-                  className="mt-2 block min-h-11 w-full border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                  className="mt-2 block min-h-11 w-full min-w-0 border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
                 />
               </label>
               <button type="submit" className="min-h-11 w-full border border-blue-700 bg-blue-700 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">
@@ -203,8 +208,8 @@ export default async function CoursesPage({ searchParams }: { searchParams: Prom
         </div>
 
         <section aria-labelledby="available-courses-heading">
-          <div className="mb-4 flex items-end justify-between gap-4">
-            <div>
+          <div className="mb-4 flex items-end justify-between gap-3 sm:gap-4">
+            <div className="min-w-0">
               <h2 id="available-courses-heading" className="text-lg font-semibold text-slate-900 dark:text-white">Available courses</h2>
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Published courses and upcoming study materials.</p>
             </div>

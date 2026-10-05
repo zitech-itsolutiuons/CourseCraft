@@ -1,5 +1,6 @@
 import { connectDB } from "@/lib/db";
 import { Course, CourseGroup, CourseGroupSettings } from "@/lib/models/Course";
+import GroupCodeInput from "@/components/admin/GroupCodeInput";
 import { createCourseGroup, setCourseGroupCodesEnabled, setCourseGroupEnabled } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +20,7 @@ export default async function AdminGroupsPage({ searchParams }: { searchParams: 
   await connectDB();
   const [settings, courses, groups] = await Promise.all([
     CourseGroupSettings.findOne({ key: "course-groups" }).select("enabled").lean(),
-    Course.find({ status: "ready" }).sort({ title: 1 }).select("title").lean(),
+    Course.find({ status: "ready", archivedAt: null }).sort({ title: 1 }).select("title").lean(),
     CourseGroup.find().sort({ createdAt: -1 }).lean(),
   ]);
   const groupCourseIds = [...new Set(groups.flatMap((group) => group.courseIds.map(String)))];
@@ -114,7 +115,7 @@ export default async function AdminGroupsPage({ searchParams }: { searchParams: 
                   </div>
                   <label className="mt-3 block max-w-xl text-xs font-medium text-slate-600">
                     Group code
-                    <input readOnly value={group.code} onFocus={(event) => event.currentTarget.select()} className="mt-1 block min-h-10 w-full border border-slate-300 bg-white px-3 py-2 font-mono text-sm text-slate-900" />
+                    <GroupCodeInput code={group.code} />
                   </label>
                   <p className="mt-2 text-xs leading-5 text-slate-500">
                     {group.courseIds.map((courseId) => courseTitles.get(String(courseId)) ?? "Course unavailable").join(", ")}

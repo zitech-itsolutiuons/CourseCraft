@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { QUIZ_PASS_THRESHOLD } from "@/lib/quizProgress";
-import { resolveChapterVideo, splitChapterVideo } from "@/lib/chapterVideo";
+import { CHAPTER_VIDEO_MARKER, resolveChapterVideo, splitChapterVideo } from "@/lib/chapterVideo";
+import { parseChapterSections } from "@/lib/chapterSections";
 import SessionActivityTracker from "@/components/SessionActivityTracker";
+import ChapterNotes from "@/components/reader/ChapterNotes";
 
 /**
  * Monochrome reader. Meaning is carried by structure, not colour:
@@ -21,7 +23,7 @@ export type FinalAssessmentView = {
   theoryQuestions: { question: string; sampleAnswer: string; gradingPoints: string[] }[];
 };
 export type ChapterView = { id: string; index: number; title: string; contentMd: string; videoUrl?: string; quiz: Question[] };
-type Props = { courseId: string; courseTitle: string; studentName: string; studentAvatar?: string; chapters: ChapterView[]; finalAssessment?: FinalAssessmentView | null; completedIds?: string[]; isOwner?: boolean; isAdmin?: boolean };
+type Props = { courseId: string; courseTitle: string; studentName: string; studentAvatar?: string; chapters: ChapterView[]; finalAssessment?: FinalAssessmentView | null; completedIds?: string[]; completedSections?: Record<string, string[]>; notesByChapter?: Record<string, string>; isOwner?: boolean; isAdmin?: boolean };
 type Msg = { role: "user" | "assistant"; content: string };
 
 const focus =
@@ -32,15 +34,57 @@ const inverted = "bg-black text-white dark:bg-white dark:text-black";
 
 /* ------------------------------ reader ------------------------------ */
 
-export default function ChapterReader({ courseId, courseTitle, studentName, studentAvatar = "", chapters, finalAssessment = null, completedIds = [], isOwner = false, isAdmin = false }: Props) {
+export default function ChapterReader({ courseId, courseTitle, studentName, studentAvatar = "", chapters, finalAssessment = null, completedIds = [], completedSections = {}, notesByChapter: initialNotes = {}, isOwner = false, isAdmin = false }: Props) {
   const [activeId, setActiveId] = useState(chapters[0].id);
   const [done, setDone] = useState(() => new Set(completedIds));
+  const [sectionProgress, setSectionProgress] = useState(completedSections);
+  const [notesByChapter, setNotesByChapter] = useState(initialNotes);
+  const [expandedIds, setExpandedIds] = useState(() => new Set([chapters[0].id]));
+  const [activeSectionId, setActiveSectionId] = useState("");
+  const [pendingSectionId, setPendingSectionId] = useState<string | null>(null);
+  const [progressError, setProgressError] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
+  const recordedSections = useRef(new Set(Object.entries(completedSections).flatMap(([chapterId, sectionIds]) => sectionIds.map((sectionId) => `${chapterId}:${sectionId}`))));
+  const failedSections = useRef(new Set<string>());
 
   const pos = chapters.findIndex((c) => c.id === activeId);
   const chapter = chapters[pos];
+  const chapterSections = useMemo(() => parseChapterSections(chapter.contentMd), [chapter.id, chapter.contentMd]);
   const allChapterQuizzesPassed = chapters.every((item) => item.quiz.length === 0 || done.has(item.id));
+
+  const saveSectionProgress = (chapterId: string, sectionId: string) => {
+    const key = `${chapterId}:${sectionId}`;
+    if (recordedSections.current.has(key)) return;
+    recordedSections.current.add(key);
+    setSectionProgress((previous) => ({
+      ...previous,
+      [chapterId]: [...new Set([...(previous[chapterId] ?? []), sectionId])],
+    }));
+    void fetch("/api/progress/sections", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ courseId, chapterId, sectionId }),
+    }).then((response) => {
+      if (!response.ok) throw new Error("Section progress could not be saved");
+      failedSections.current.delete(key);
+      setProgressError(failedSections.current.size > 0);
+    }).catch(() => {
+      failedSections.current.add(key);
+      setProgressError(true);
+    });
+  };
+
+  const retrySectionProgress = () => {
+    const retry = [...failedSections.current];
+    failedSections.current.clear();
+    setProgressError(false);
+    for (const key of retry) {
+      const separator = key.indexOf(":");
+      recordedSections.current.delete(key);
+      saveSectionProgress(key.slice(0, separator), key.slice(separator + 1));
+    }
+  };
 
   const isChapterUnlocked = (index: number) => {
     if (isOwner || index <= 0) return true;
@@ -52,9 +96,60 @@ export default function ChapterReader({ courseId, courseTitle, studentName, stud
     const targetIndex = chapters.findIndex((c) => c.id === id);
     if (targetIndex < 0 || !isChapterUnlocked(targetIndex)) return;
     setActiveId(id);
+    setActiveSectionId("");
+    setExpandedIds((previous) => new Set(previous).add(id));
+    setPendingSectionId(null);
     setNavOpen(false);
     mainRef.current?.scrollTo({ top: 0 });
   };
+
+  const selectSection = (chapterId: string, sectionId: string) => {
+    setExpandedIds((previous) => new Set(previous).add(chapterId));
+    setNavOpen(false);
+    if (chapterId !== activeId) {
+      setActiveId(chapterId);
+      setActiveSectionId(sectionId);
+      setPendingSectionId(sectionId);
+      mainRef.current?.scrollTo({ top: 0 });
+      return;
+    }
+    document.getElementById(`${chapterId}-${sectionId}`)?.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      block: "start",
+    });
+  };
+
+  useEffect(() => {
+    const main = mainRef.current;
+    if (!main) return;
+    const headings = [...main.querySelectorAll<HTMLElement>("[data-section-heading]")];
+    if (!headings.length) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      const visible = entries.filter((entry) => entry.isIntersecting).sort(
+        (a, b) => a.boundingClientRect.top - b.boundingClientRect.top
+      );
+      for (const entry of visible) {
+        const sectionId = (entry.target as HTMLElement).dataset.sectionHeading;
+        if (sectionId) saveSectionProgress(chapter.id, sectionId);
+      }
+      if (visible[0]) setActiveSectionId((visible[0].target as HTMLElement).dataset.sectionHeading ?? "");
+    }, { root: main, rootMargin: "0px 0px -68% 0px", threshold: 0 });
+
+    headings.forEach((heading) => observer.observe(heading));
+    return () => observer.disconnect();
+  }, [chapter.id, chapterSections, courseId]);
+
+  useEffect(() => {
+    if (!pendingSectionId) return;
+    const target = document.getElementById(`${chapter.id}-${pendingSectionId}`);
+    if (!target) return;
+    target.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      block: "start",
+    });
+    setPendingSectionId(null);
+  }, [chapter.id, pendingSectionId]);
 
   function handleQuizDone(score: number, total: number, answers: number[]) {
     if (score / total >= QUIZ_PASS_THRESHOLD) setDone((p) => new Set(p).add(chapter.id));
@@ -97,6 +192,14 @@ export default function ChapterReader({ courseId, courseTitle, studentName, stud
             >
               Chapters
             </button>
+            <ChapterNotes
+              key={chapter.id}
+              courseTitle={courseTitle}
+              chapterId={chapter.id}
+              chapterTitle={chapter.title}
+              initialNote={notesByChapter[chapter.id] ?? ""}
+              onNoteChange={(content) => setNotesByChapter((previous) => ({ ...previous, [chapter.id]: content }))}
+            />
           </div>
         </div>
         {/* One segment per chapter: filled = completed */}
@@ -118,34 +221,96 @@ export default function ChapterReader({ courseId, courseTitle, studentName, stud
             {chapters.map((c, i) => {
               const active = c.id === activeId;
               const locked = !isChapterUnlocked(i);
+              const sections = parseChapterSections(c.contentMd);
+              const completedSectionCount = (sectionProgress[c.id] ?? []).filter((sectionId) =>
+                sections.some((section) => section.id === sectionId)
+              ).length;
+              const percentage = Math.round((completedSectionCount / sections.length) * 100);
+              const expanded = expandedIds.has(c.id);
               return (
                 <li key={c.id}>
-                  <button
+                  <div className={`flex items-start gap-2 border-0 border-b ${soft} px-3 py-3 ${active ? "bg-black text-white dark:bg-white dark:text-black" : ""}`}>
+                    <button
                       disabled={locked}
-                    onClick={() => go(c.id)}
-                    aria-current={active ? "page" : undefined}
+                      onClick={() => go(c.id)}
+                      aria-current={active ? "page" : undefined}
                       aria-label={locked ? `${c.title}. Locked. Score at least 65% on ${chapters[i - 1].title} to unlock.` : undefined}
-                    className={`flex w-full items-start gap-3 border-0 border-b ${soft} px-4 py-3 text-left font-sans text-sm ${focus}
-                        ${active ? inverted : locked ? "cursor-not-allowed text-zinc-500 opacity-70" : "hover:bg-zinc-100 dark:hover:bg-zinc-900"}`}
-                  >
+                      className={`flex min-w-0 flex-1 items-start gap-3 text-left font-sans text-sm ${focus}
+                        ${locked ? "cursor-not-allowed text-zinc-500 opacity-70" : active ? "" : "hover:text-blue-800 dark:hover:text-blue-200"}`}
+                    >
                       {locked ? <LockIcon /> : (
                         <span
-                          aria-label={done.has(c.id) ? "Completed" : "Not completed"}
-                          className={`mt-1 h-3 w-3 shrink-0 border ${active ? "border-current" : "border-black dark:border-white"}
-                            ${done.has(c.id) ? "bg-current" : ""}`}
+                          aria-label={done.has(c.id) ? "Quiz passed" : "Quiz not passed"}
+                          className={`mt-1 h-3 w-3 shrink-0 border ${
+                            done.has(c.id)
+                              ? "border-emerald-600 bg-emerald-600 dark:border-emerald-400 dark:bg-emerald-400"
+                              : active ? "border-current" : "border-black dark:border-white"
+                          }`}
                         />
                       )}
-                    <span>
-                      {i + 1}. {c.title}
-                    </span>
-                  </button>
+                      <span className="min-w-0 flex-1">
+                        <span className="block">{i + 1}. {c.title}</span>
+                        <span className={`mt-2 flex items-center gap-2 text-xs ${active ? "text-zinc-300 dark:text-zinc-600" : "text-zinc-500"}`}>
+                          <SectionProgressRing completed={completedSectionCount} total={sections.length} title={c.title} />
+                          <span>{completedSectionCount} of {sections.length} sections</span>
+                        </span>
+                        <span
+                          role="progressbar"
+                          aria-label={`${c.title} reading progress`}
+                          aria-valuemin={0}
+                          aria-valuemax={sections.length}
+                          aria-valuenow={completedSectionCount}
+                          className={`mt-1.5 block h-1 w-full ${active ? "bg-white/25 dark:bg-black/20" : "bg-zinc-200 dark:bg-zinc-800"}`}
+                        >
+                          <span className={`block h-full ${active ? "bg-white dark:bg-black" : "bg-black dark:bg-white"}`} style={{ width: `${percentage}%` }} />
+                        </span>
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={locked}
+                      aria-expanded={expanded}
+                      aria-label={`${expanded ? "Hide" : "Show"} sections for ${c.title}`}
+                      onClick={() => setExpandedIds((previous) => {
+                        const next = new Set(previous);
+                        if (next.has(c.id)) next.delete(c.id);
+                        else next.add(c.id);
+                        return next;
+                      })}
+                      className={`shrink-0 px-1 py-0.5 text-xs ${locked ? "opacity-40" : ""} ${focus}`}
+                    >
+                      <ChevronIcon expanded={expanded} />
+                    </button>
+                  </div>
+                  {expanded && !locked && (
+                    <ol className={`border-b ${soft} py-1 ${active ? "bg-zinc-50 dark:bg-zinc-950" : ""}`}>
+                      {sections.map((section) => {
+                        const completed = (sectionProgress[c.id] ?? []).includes(section.id);
+                        const selected = active && activeSectionId === section.id;
+                        return (
+                          <li key={section.id}>
+                            <button
+                              type="button"
+                              onClick={() => selectSection(c.id, section.id)}
+                              aria-current={selected ? "location" : undefined}
+                              className={`flex w-full items-center gap-2 py-2 pl-10 pr-4 text-left text-xs ${focus}
+                                ${selected ? "font-semibold text-blue-800 dark:text-blue-200" : "text-zinc-600 hover:text-black dark:text-zinc-400 dark:hover:text-white"}`}
+                            >
+                              <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${completed ? "bg-emerald-600 dark:bg-emerald-400" : selected ? "bg-blue-700 dark:bg-blue-300" : "bg-zinc-300 dark:bg-zinc-700"}`} />
+                              <span className="line-clamp-2">{section.title}</span>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ol>
+                  )}
                 </li>
               );
             })}
           </ol>
         </nav>
 
-        <main ref={mainRef} className="min-w-0 flex-1 overflow-y-auto px-5 py-10 md:px-12">
+        <main ref={mainRef} className="min-w-0 flex-1 overflow-y-auto px-5 py-10 md:px-12 xl:ml-80">
           <article
             className="prose prose-zinc mx-auto max-w-[68ch] font-serif dark:prose-invert
               prose-headings:font-sans prose-headings:font-semibold prose-a:underline
@@ -153,10 +318,31 @@ export default function ChapterReader({ courseId, courseTitle, studentName, stud
               prose-code:before:content-none prose-code:after:content-none prose-pre:rounded-none prose-pre:border prose-pre:border-zinc-300 dark:prose-pre:border-zinc-800"
           >
             <h1>{chapter.title}</h1>
-            {splitChapterVideo(chapter.contentMd, chapter.videoUrl).map((block) => block.kind === "video"
-              ? <ChapterVideo key={block.key} url={chapter.videoUrl!} title={chapter.title} />
-              : <ReactMarkdown key={block.key} remarkPlugins={[remarkGfm]}>{block.content}</ReactMarkdown>)}
+            {chapterSections.map((section, index) => (
+              <section
+                key={section.id}
+                id={`${chapter.id}-${section.id}`}
+                className="scroll-mt-6"
+              >
+                <h2 data-section-heading={section.id}>{section.title}</h2>
+                {splitChapterVideo(
+                  section.contentMd,
+                  chapter.contentMd.includes(CHAPTER_VIDEO_MARKER) || index === 0 ? chapter.videoUrl : ""
+                ).map((block) => block.kind === "video"
+                  ? <ChapterVideo key={block.key} url={chapter.videoUrl!} title={chapter.title} />
+                  : <ReactMarkdown key={block.key} remarkPlugins={[remarkGfm]}>{block.content}</ReactMarkdown>)}
+              </section>
+            ))}
           </article>
+
+          {progressError && (
+            <p role="status" className="mx-auto mt-4 flex max-w-[68ch] items-center gap-3 text-sm text-red-700 dark:text-red-300">
+              Reading progress could not be synced.
+              <button type="button" onClick={retrySectionProgress} className="font-semibold underline underline-offset-4">
+                Retry
+              </button>
+            </p>
+          )}
 
           {chapter.quiz.length > 0 && (
             <section className={`mx-auto mt-14 flex max-w-[68ch] flex-col gap-5 border-y ${soft} py-6 font-sans sm:flex-row sm:items-center sm:justify-between`}>
@@ -647,9 +833,13 @@ function AssistantDrawer({ chapterId, chapterTitle, studentName, studentAvatar }
         onClick={() => setOpen(true)}
         aria-expanded={open}
         aria-controls="study-assistant-panel"
-        className={`fixed bottom-4 right-4 z-40 ${inverted} border border-black px-4 py-3 font-sans text-sm font-medium dark:border-white ${focus}`}
+        className={`fixed bottom-4 right-4 z-40 inline-flex min-h-14 max-w-[calc(100vw-2rem)] items-center gap-3 border border-blue-700 bg-blue-700 px-5 py-4 font-sans text-base font-semibold text-white hover:border-blue-800 hover:bg-blue-800 dark:border-blue-500 dark:bg-blue-600 dark:text-white dark:hover:border-blue-400 dark:hover:bg-blue-500 ${focus}`}
       >
-        AI study assistant
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-5 w-5 shrink-0" stroke="currentColor" strokeWidth="1.8">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 18.5 4 20l1.5-3.5A8 8 0 1 1 7.5 18.5Z" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h8M8 14h5" />
+        </svg>
+        <span>Ask AI study assistant</span>
       </button>
 
       <aside
@@ -825,6 +1015,61 @@ function LockIcon() {
     <svg aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-zinc-500" viewBox="0 0 16 16" fill="none">
       <rect x="3" y="7" width="10" height="7" rx="1" stroke="currentColor" strokeWidth="1.5" />
       <path d="M5.5 7V4.75a2.5 2.5 0 0 1 5 0V7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ChevronIcon({ expanded }: { expanded: boolean }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={`h-4 w-4 transition-transform motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`}
+      viewBox="0 0 16 16"
+      fill="none"
+    >
+      <path d="m4 6 4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function SectionProgressRing({ completed, total, title }: { completed: number; total: number; title: string }) {
+  const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+  const circumference = 2 * Math.PI * 9;
+
+  return (
+    <svg
+      aria-label={`${title} section progress`}
+      aria-valuemin={0}
+      aria-valuemax={total}
+      aria-valuenow={completed}
+      aria-valuetext={`${completed} of ${total} sections complete`}
+      className="h-6 w-6 shrink-0"
+      role="progressbar"
+      viewBox="0 0 24 24"
+    >
+      <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-zinc-300 dark:text-zinc-700" />
+      <circle
+        cx="12"
+        cy="12"
+        r="9"
+        fill="none"
+        stroke="currentColor"
+        strokeDasharray={circumference}
+        strokeDashoffset={circumference * (1 - percentage / 100)}
+        strokeLinecap="round"
+        strokeWidth="2.5"
+        transform="rotate(-90 12 12)"
+        className="text-emerald-600 transition-[stroke-dashoffset] motion-reduce:transition-none dark:text-emerald-400"
+      />
+      <text
+        x="12"
+        y="12"
+        dominantBaseline="central"
+        textAnchor="middle"
+        className="fill-current font-sans text-[6px] font-semibold text-zinc-700 dark:text-zinc-300"
+      >
+        {percentage}
+      </text>
     </svg>
   );
 }

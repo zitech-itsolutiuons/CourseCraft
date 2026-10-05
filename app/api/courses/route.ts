@@ -47,6 +47,7 @@ export async function POST(req: Request) {
     const course = await Course.findOne({
       _id: targetCourseId,
       catalogVisible: true,
+      archivedAt: null,
       status: { $in: ["comingSoon", "failed"] },
     }).select("_id").lean();
     if (!course) return NextResponse.json({ error: "This course is not ready for materials" }, { status: 409 });

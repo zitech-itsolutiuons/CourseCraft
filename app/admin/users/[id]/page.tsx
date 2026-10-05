@@ -27,7 +27,7 @@ export default async function UserCourseAccessPage({
   await connectDB();
   const [user, courses, restrictions] = await Promise.all([
     User.findById(id).select("name email role").lean(),
-    Course.find().sort({ title: 1 }).select("title status chapterCount").lean(),
+    Course.find({ archivedAt: null }).sort({ title: 1 }).select("title status chapterCount").lean(),
     CourseRestriction.find({ userId: id }).select("courseId").lean(),
   ]);
   if (!user) notFound();

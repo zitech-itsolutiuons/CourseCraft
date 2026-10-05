@@ -8,7 +8,7 @@ import ChapterReader, { type ChapterView } from "@/components/reader/ChapterRead
 import { connectDB } from "@/lib/db";
 import { isAdmin } from "@/lib/auth";
 import { getCourseAccess } from "@/lib/access";
-import { Chapter, CourseFinalAssessment, Quiz, StudentProgress } from "@/lib/models/Course";
+import { Chapter, CourseFinalAssessment, Quiz, StudentNote, StudentProgress } from "@/lib/models/Course";
 import { PlatformSettings } from "@/lib/models/PlatformSettings";
 import { UserProfile } from "@/lib/models/UserProfile";
 import { QUIZ_PASS_THRESHOLD } from "@/lib/quizProgress";
@@ -48,13 +48,14 @@ export default async function CoursePage({ params }: { params: Promise<{ id: str
     );
   }
 
-  const [chapters, quizzes, progress, settings, profile, finalAssessment] = await Promise.all([
+  const [chapters, quizzes, progress, settings, profile, finalAssessment, savedNotes] = await Promise.all([
     Chapter.find({ courseId: id }).sort({ index: 1 }).lean(),
     Quiz.find({ courseId: id }).lean(),
     StudentProgress.findOne({ userId, courseId: id }).lean(),
     PlatformSettings.findOne({ key: "platform" }).select("studentQuizQuestionLimit").lean(),
     UserProfile.findOne({ userId }).select("displayName avatarData").lean(),
     CourseFinalAssessment.findOne({ courseId: id }).lean(),
+    StudentNote.find({ userId, courseId: id }).select("chapterId content").lean(),
   ]);
 
   if (course.status === "processing") {
@@ -148,6 +149,14 @@ export default async function CoursePage({ params }: { params: Promise<{ id: str
       isOwner={access.role === "owner"}
       isAdmin={await isAdmin(userId)}
       chapters={views}
+      completedSections={Object.fromEntries(
+        (progress?.completedSections ?? []).reduce<Map<string, string[]>>((byChapter, section) => {
+          const chapterId = String(section.chapterId);
+          byChapter.set(chapterId, [...(byChapter.get(chapterId) ?? []), section.sectionId]);
+          return byChapter;
+        }, new Map())
+      )}
+      notesByChapter={Object.fromEntries(savedNotes.map((note) => [String(note.chapterId), note.content]))}
       finalAssessment={finalAssessment ? {
         objectiveQuestions: finalAssessment.objectiveQuestions.map((question) => ({
           question: question.question,

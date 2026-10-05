@@ -12,7 +12,7 @@ export async function getCourseAccess(courseId: string, userId: string, options:
   if (!isValidObjectId(courseId)) return null;
   await connectDB();
   const course = await Course.findById(courseId).lean();
-  if (!course) return null;
+  if (!course || course.archivedAt) return null;
   if (await CourseRestriction.exists({ userId, courseId: course._id })) return null;
   if (course.ownerId === userId) return { course, role: "owner" as const };
   if (course.catalogVisible && course.status === "ready") return { course, role: "student" as const };

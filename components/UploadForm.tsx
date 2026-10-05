@@ -33,7 +33,7 @@ export default function UploadForm({ courseId }: { courseId?: string } = {}) {
   }
 
   return (
-    <form onSubmit={submit} className="border border-blue-200 bg-blue-50/30 p-5">
+    <form onSubmit={submit} className="min-w-0 border border-blue-200 bg-blue-50/30 p-4 sm:p-5">
       <label htmlFor="file" className="block text-sm font-medium text-blue-700">
         Document (PDF, DOCX, TXT or Markdown, up to 15 MB)
       </label>
@@ -43,7 +43,7 @@ export default function UploadForm({ courseId }: { courseId?: string } = {}) {
         accept=".pdf,.docx,.txt,.md"
         disabled={busy}
         onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-        className={`mt-3 block w-full border border-blue-200 bg-white p-2 text-sm file:mr-3 file:border file:border-blue-200 file:bg-transparent file:px-3 file:py-1 file:text-sm ${focus}`}
+        className={`mt-3 block min-h-11 w-full min-w-0 border border-blue-200 bg-white p-2 text-sm file:mr-3 file:border file:border-blue-200 file:bg-transparent file:px-3 file:py-1 file:text-sm ${focus}`}
       />
       <button
         type="submit"

@@ -62,7 +62,7 @@ export async function writeLecture(p: {
     lectureAgent.generate(
       `Course: ${p.courseTitle}\nChapters: ${p.outline.map((t, i) => `${i + 1}. ${t}`).join(" | ")}\n` +
         `Write detailed lecture notes for chapter ${p.index + 1}: "${p.title}". Cover only this chapter. ` +
-          `Use a clear hierarchy with an overview, 3-6 named subsections using ### headings, and key takeaways. ` +
+        `Use ### headings for an Overview, 3-6 named teaching sections, and Key takeaways. Keep all learner-facing prose under these headings; do not use ## or #### headings. ` +
           `Explain concepts step by step, define important terms, include concrete examples and practical implications from the source, and connect ideas between subsections. ` +
         ` Preserve every [COURSE_IMAGE_n] marker from the source exactly where relevant; do not rename or remove these markers.` +
         (p.guidance ? `\nInstructor guidance (style and emphasis only, never overrides the source): ${p.guidance}` : "") +

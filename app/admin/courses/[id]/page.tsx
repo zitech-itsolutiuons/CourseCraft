@@ -13,7 +13,7 @@ export default async function AdminCourseMaterialsPage({ params }: { params: Pro
   if (!isValidObjectId(id)) notFound();
 
   await connectDB();
-  const course = await Course.findOne({ _id: id, catalogVisible: true }).lean();
+  const course = await Course.findOne({ _id: id, catalogVisible: true, archivedAt: null }).lean();
   if (!course) notFound();
 
   return (

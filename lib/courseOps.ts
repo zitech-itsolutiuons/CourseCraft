@@ -1,6 +1,17 @@
 import { randomBytes } from "node:crypto";
 import { connectDB } from "./db";
-import { Chapter, Course, CourseGroup, CourseGroupSettings, CourseMedia, CourseRestriction, Quiz, StudentProgress } from "./models/Course";
+import {
+  Chapter,
+  Course,
+  CourseFinalAssessment,
+  CourseGroup,
+  CourseGroupSettings,
+  CourseMedia,
+  CourseRestriction,
+  Quiz,
+  StudentNote,
+  StudentProgress,
+} from "./models/Course";
 
 /**
  * Database operations behind the editor and sharing routes. Kept out of the route
@@ -42,13 +53,21 @@ export async function deleteChapter(courseId: string, chapterId: string) {
 
 export async function deleteCourse(courseId: string) {
   await connectDB();
+  const groupsContainingCourse = await CourseGroup.find({ courseIds: courseId }).select("_id").lean();
   await Promise.all([
     Chapter.deleteMany({ courseId }),
     CourseMedia.deleteMany({ courseId }),
     Quiz.deleteMany({ courseId }),
+    CourseFinalAssessment.deleteMany({ courseId }),
+    StudentNote.deleteMany({ courseId }),
     StudentProgress.deleteMany({ courseId }),
     CourseRestriction.deleteMany({ courseId }),
+    CourseGroup.updateMany({ courseIds: courseId }, { $pull: { courseIds: courseId } }),
   ]);
+  await CourseGroup.deleteMany({
+    _id: { $in: groupsContainingCourse.map((group) => group._id) },
+    courseIds: { $size: 0 },
+  });
   await Course.deleteOne({ _id: courseId });
 }
 
@@ -69,7 +88,7 @@ export async function setSharing(courseId: string, opts: { enabled?: boolean; re
 /** Enrols the user in the course behind a share link. Returns null when the link is invalid or switched off. */
 export async function joinByCode(code: string, user: { id: string; name?: string | null; email?: string | null }) {
   await connectDB();
-  const course = await Course.findOne({ shareCode: code, sharingEnabled: true, status: "ready" }).lean();
+  const course = await Course.findOne({ shareCode: code, sharingEnabled: true, status: "ready", archivedAt: null }).lean();
   if (course) {
     if (await CourseRestriction.exists({ userId: user.id, courseId: course._id })) return null;
     if (course.ownerId === user.id) return course;
@@ -86,7 +105,7 @@ export async function joinByCode(code: string, user: { id: string; name?: string
   const group = await CourseGroup.findOne({ code, enabled: true }).lean();
   if (!group) return null;
 
-  const courses = await Course.find({ _id: { $in: group.courseIds }, status: "ready" }).select("_id ownerId").lean();
+  const courses = await Course.find({ _id: { $in: group.courseIds }, status: "ready", archivedAt: null }).select("_id ownerId").lean();
   const restrictions = await CourseRestriction.find({ userId: user.id, courseId: { $in: courses.map((item) => item._id) } })
     .select("courseId")
     .lean();

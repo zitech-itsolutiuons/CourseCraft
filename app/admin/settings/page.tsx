@@ -9,12 +9,15 @@ export default async function AdminSettingsPage() {
   const settings = await PlatformSettings.findOne({ key: "platform" }).select("studentQuizQuestionLimit").lean();
 
   return (
-    <section aria-labelledby="settings-heading" className="max-w-3xl space-y-5">
+    <section aria-labelledby="settings-heading" className="max-w-3xl space-y-10">
       <header>
         <h2 id="settings-heading" className="text-xl font-semibold text-slate-900">Platform settings</h2>
-        <p className="mt-1 text-sm leading-6 text-slate-600">Set how many questions students receive from each chapter’s quiz bank.</p>
+        <p className="mt-1 text-sm leading-6 text-slate-600">Manage student quiz access across the platform.</p>
       </header>
-      <StudentQuizLimitForm limit={settings?.studentQuizQuestionLimit ?? 15} />
+      <section aria-labelledby="quiz-settings-heading" className="space-y-2">
+        <h3 id="quiz-settings-heading" className="text-lg font-semibold text-slate-900">Chapter quizzes</h3>
+        <StudentQuizLimitForm limit={settings?.studentQuizQuestionLimit ?? 15} />
+      </section>
     </section>
   );
 }

@@ -61,7 +61,7 @@ export default async function SiteHeader() {
             )}
           </div>
           <details className="relative sm:hidden">
-            <summary className="flex min-h-10 cursor-pointer list-none items-center border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
               Menu
             </summary>
             <div className="absolute right-0 top-full z-[60] mt-2 grid w-56 gap-1 border border-slate-200 bg-white p-2 text-sm shadow-lg dark:border-slate-700 dark:bg-slate-900">

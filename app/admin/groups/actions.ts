@@ -39,7 +39,7 @@ export async function createCourseGroup(formData: FormData) {
   if (!parsed.success) redirect("/admin/groups?notice=invalid");
 
   await connectDB();
-  const courses = await Course.find({ _id: { $in: parsed.data.courseIds }, status: "ready" }).select("_id").lean();
+  const courses = await Course.find({ _id: { $in: parsed.data.courseIds }, status: "ready", archivedAt: null }).select("_id").lean();
   if (courses.length !== parsed.data.courseIds.length) redirect("/admin/groups?notice=unavailable");
 
   let code: string;

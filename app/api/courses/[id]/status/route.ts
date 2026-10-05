@@ -19,7 +19,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (!ownerId) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
   await connectDB();
   const c = await Course.findById(id).lean();
-  if (!c || (c.ownerId !== ownerId && !(await isAdmin(ownerId))))
+  if (!c || c.archivedAt || (c.ownerId !== ownerId && !(await isAdmin(ownerId))))
     return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   let { status, stage, error } = c;

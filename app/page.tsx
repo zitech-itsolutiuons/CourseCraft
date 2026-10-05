@@ -15,7 +15,7 @@ export default async function Home() {
     : [];
   const [savedContent, availableCourses] = await Promise.all([
     HomepageContent.findOne({ key: "home" }).lean(),
-    Course.find({ catalogVisible: true, status: "ready", _id: { $nin: restrictedIds } })
+    Course.find({ catalogVisible: true, status: "ready", archivedAt: null, _id: { $nin: restrictedIds } })
       .sort({ title: 1 })
       .select("title description chapterCount")
       .lean(),

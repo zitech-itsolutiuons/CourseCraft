@@ -21,10 +21,13 @@ export default async function AdminDashboardPage() {
     User.countDocuments(),
     User.countDocuments({ role: "admin" }),
     User.countDocuments({ createdAt: { $gte: since } }),
-    Course.countDocuments(),
-    Course.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]) as Promise<{ _id: string; count: number }[]>,
+    Course.countDocuments({ archivedAt: null }),
+    Course.aggregate([
+      { $match: { archivedAt: null } },
+      { $group: { _id: "$status", count: { $sum: 1 } } },
+    ]) as Promise<{ _id: string; count: number }[]>,
     User.find().sort({ createdAt: -1 }).limit(5).select("name email role createdAt").lean(),
-    Course.find({ ownerId: adminId }).sort({ createdAt: -1 }).limit(8).select("title status chapterCount createdAt").lean(),
+    Course.find({ ownerId: adminId, archivedAt: null }).sort({ createdAt: -1 }).limit(8).select("title status chapterCount createdAt").lean(),
   ]);
 
   const statusCounts = new Map(courseStatuses.map(({ _id, count }) => [_id, count]));
@@ -95,7 +98,9 @@ export default async function AdminDashboardPage() {
             <h2 id="managed-courses-heading" className="text-lg font-semibold text-slate-900">Courses you manage</h2>
             <p className="mt-1 text-sm text-slate-500">Edit course content, review student activity, or open a course.</p>
           </div>
-          <span className="shrink-0 text-sm tabular-nums text-slate-500">{managedCourses.length} recent</span>
+          <Link href="/admin/courses" className="shrink-0 text-sm font-medium text-blue-700 hover:text-blue-900">
+            Manage all courses
+          </Link>
         </div>
         {managedCourses.length ? (
           <div className="overflow-x-auto border-y border-slate-200 bg-white">

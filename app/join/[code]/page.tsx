@@ -15,7 +15,7 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
   const user = session.user;
 
   await connectDB();
-  const course = await Course.findOne({ shareCode: code, sharingEnabled: true, status: "ready" }).lean();
+  const course = await Course.findOne({ shareCode: code, sharingEnabled: true, status: "ready", archivedAt: null }).lean();
 
   if (!course) {
     return (

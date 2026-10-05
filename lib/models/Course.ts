@@ -25,6 +25,7 @@ const CourseSchema = new Schema(
     // Sharing: students join through /join/<shareCode> while sharingEnabled is true
     sharingEnabled: { type: Boolean, default: false },
     shareCode: { type: String, index: true },
+    archivedAt: { type: Date, default: null, index: true },
   },
   { timestamps: true }
 );
@@ -101,6 +102,13 @@ const StudentProgressSchema = new Schema(
     userId: { type: String, required: true },
     courseId: { type: Schema.Types.ObjectId, ref: "Course", required: true },
     completedChapterIds: [{ type: Schema.Types.ObjectId, ref: "Chapter" }],
+    completedSections: [
+      {
+        chapterId: { type: Schema.Types.ObjectId, ref: "Chapter", required: true },
+        sectionId: { type: String, required: true },
+        _id: false,
+      },
+    ],
     lastChapterId: { type: Schema.Types.ObjectId, ref: "Chapter" },
     quizAttempts: [
       {
@@ -132,6 +140,17 @@ const StudentProgressSchema = new Schema(
   { timestamps: true }
 );
 StudentProgressSchema.index({ userId: 1, courseId: 1 }, { unique: true });
+
+const StudentNoteSchema = new Schema(
+  {
+    userId: { type: String, required: true },
+    courseId: { type: Schema.Types.ObjectId, ref: "Course", required: true },
+    chapterId: { type: Schema.Types.ObjectId, ref: "Chapter", required: true },
+    content: { type: String, required: true, maxlength: 20_000, default: "" },
+  },
+  { timestamps: true }
+);
+StudentNoteSchema.index({ userId: 1, courseId: 1, chapterId: 1 }, { unique: true });
 
 const CourseRestrictionSchema = new Schema(
   {
@@ -169,6 +188,7 @@ export type CourseMediaDoc = InferSchemaType<typeof CourseMediaSchema>;
 export type QuizDoc = InferSchemaType<typeof QuizSchema>;
 export type CourseFinalAssessmentDoc = InferSchemaType<typeof CourseFinalAssessmentSchema>;
 export type StudentProgressDoc = InferSchemaType<typeof StudentProgressSchema>;
+export type StudentNoteDoc = InferSchemaType<typeof StudentNoteSchema>;
 export type CourseRestrictionDoc = InferSchemaType<typeof CourseRestrictionSchema>;
 export type CourseGroupDoc = InferSchemaType<typeof CourseGroupSchema>;
 export type CourseGroupSettingsDoc = InferSchemaType<typeof CourseGroupSettingsSchema>;
@@ -182,6 +202,7 @@ export const CourseFinalAssessment: Model<CourseFinalAssessmentDoc> =
   models.CourseFinalAssessment || model<CourseFinalAssessmentDoc>("CourseFinalAssessment", CourseFinalAssessmentSchema);
 export const StudentProgress: Model<StudentProgressDoc> =
   models.StudentProgress || model<StudentProgressDoc>("StudentProgress", StudentProgressSchema);
+export const StudentNote: Model<StudentNoteDoc> = models.StudentNote || model<StudentNoteDoc>("StudentNote", StudentNoteSchema);
 export const CourseRestriction: Model<CourseRestrictionDoc> =
   models.CourseRestriction || model<CourseRestrictionDoc>("CourseRestriction", CourseRestrictionSchema);
 export const CourseGroup: Model<CourseGroupDoc> = models.CourseGroup || model<CourseGroupDoc>("CourseGroup", CourseGroupSchema);
