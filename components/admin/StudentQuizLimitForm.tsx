@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { saveStudentQuizQuestionLimitAction, type SignupCodeActionState } from "@/app/admin/actions";
+import PendingSubmitButton from "@/components/ui/PendingSubmitButton";
 
 const focus = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700";
 
@@ -24,13 +25,12 @@ export default function StudentQuizLimitForm({ limit }: { limit: number }) {
             ))}
           </select>
         </label>
-        <button
-          type="submit"
-          disabled={pending}
+        <PendingSubmitButton
+          pendingLabel="Saving..."
           className={`border border-blue-700 bg-blue-700 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-800 disabled:cursor-wait disabled:opacity-50 ${focus}`}
         >
-          {pending ? "Saving..." : "Save settings"}
-        </button>
+          Save settings
+        </PendingSubmitButton>
       </div>
       <p className="max-w-2xl text-sm leading-6 text-slate-600">Generated chapters can contain up to 15 questions. This setting controls how many are shown to students across all courses; admins can still review the full quiz bank in the course editor.</p>
       {state.success && <p role="status" className="text-sm text-emerald-700">{state.success}</p>}

@@ -17,6 +17,25 @@ and the parser was smoke-tested on a real PDF). Not yet run end to end against M
 Pages: `/` landing, `/courses` upload + course list, `/courses/[id]` reader with quiz and assistant.
 Auth: Auth.js v5, see the Authentication section below.
 
+## Personalized course reconstruction
+
+Users with paid access or an administrator grant can create private course copies from courses they can access. The original stays unchanged.
+Each account can start three reconstructions per week (each started run uses a slot), resetting Monday at midnight in Nigeria time (`Africa/Lagos`). The learner prompt
+can tailor presentation, examples, and depth while the source subject and learning goals are preserved.
+
+To enable Paystack checkout:
+
+1. Set `PAYSTACK_SECRET_KEY` and `APP_URL` in the server environment. Use the live secret key only in production; `APP_URL` must be the public
+   HTTPS origin in production.
+2. In Paystack, configure the webhook URL as `{APP_URL}/api/payments/paystack/webhook` and subscribe to `charge.success`. The callback URL is
+   supplied automatically by the app.
+3. In the admin dashboard, set the one-time whole-naira price under **Platform settings → AI course reconstruction**. A zero price keeps checkout
+   unavailable. Administrators can grant or revoke access per user from **Users**.
+
+Payment access is granted only after the server verifies the transaction reference, amount, NGN currency, and customer email with Paystack.
+The browser redirect alone does not unlock the feature. In local development, Paystack needs a publicly reachable callback/webhook URL for a full
+payment-flow test.
+
 ## Monochrome shadcn tokens (already in `app/globals.css`)
 
 ```css

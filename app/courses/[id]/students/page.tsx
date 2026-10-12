@@ -124,10 +124,13 @@ export default async function StudentsPage({ params }: { params: Promise<{ id: s
             <section aria-labelledby="students-h">
               <h2 id="students-h" className="mb-3 text-lg font-semibold">Students</h2>
               <div className="overflow-x-auto border border-black dark:border-white">
-                <table className="w-full min-w-[42rem] text-sm">
+                <table className="w-full min-w-[68rem] text-sm">
                   <thead className="border-0 border-b border-black dark:border-white">
                     <tr>
                       <th className={th}>Student</th>
+                      <th className={th}>Student ID</th>
+                      <th className={th}>Department</th>
+                      <th className={th}>Level</th>
                       <th className={th}>Chapters completed</th>
                       <th className={th}>Quiz average</th>
                       <th className={th}>Assistant questions</th>
@@ -144,6 +147,9 @@ export default async function StudentsPage({ params }: { params: Promise<{ id: s
                             {s.name ?? s.email ?? "Unnamed student"}
                             {s.name && s.email && <span className="block text-xs text-zinc-500">{s.email}</span>}
                           </td>
+                          <td className={td}>{s.studentId ?? "Not set"}</td>
+                          <td className={td}>{s.department ?? "Not set"}</td>
+                          <td className={td}>{s.level ?? "Not set"}</td>
                           <td className={td}>{s.completed} of {data.chapters.length}</td>
                           <td className={td}>{pct(s.avgScore)}</td>
                           <td className={td}>{s.assistantMessages}</td>

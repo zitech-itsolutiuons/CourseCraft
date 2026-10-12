@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import LoadingSpinner from "@/components/ui/LoadingSpinner";
 
 const btn =
   "border border-blue-200 bg-white px-3 py-1.5 text-sm text-blue-700 hover:bg-blue-50 disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600";
@@ -18,11 +19,12 @@ export default function SharePanel({
 }) {
   const [enabled, setEnabled] = useState(initialEnabled);
   const [code, setCode] = useState(initialCode);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<"toggle" | "reset" | null>(null);
+  const [copying, setCopying] = useState<"code" | "link" | null>(null);
   const [note, setNote] = useState("");
 
   async function update(body: { enabled?: boolean; reset?: boolean }) {
-    setBusy(true);
+    setBusy(body.reset ? "reset" : "toggle");
     setNote("");
     try {
       const res = await fetch(`/api/courses/${courseId}/sharing`, {
@@ -37,11 +39,25 @@ export default function SharePanel({
     } catch (err) {
       setNote((err as Error).message);
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
 
   const link = code ? `${origin}/join/${code}` : "";
+
+  async function copy(value: string, kind: "code" | "link") {
+    if (copying) return;
+    setCopying(kind);
+    setNote("");
+    try {
+      await navigator.clipboard.writeText(value);
+      setNote(kind === "code" ? "Course code copied." : "Link copied.");
+    } catch {
+      setNote(`Could not copy the ${kind}. Select it and copy it manually.`);
+    } finally {
+      setCopying(null);
+    }
+  }
 
   return (
     <section aria-labelledby="share-heading" className="border border-blue-200 bg-blue-50/30 p-5">
@@ -53,17 +69,20 @@ export default function SharePanel({
       </p>
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
-        <button type="button" aria-pressed={enabled} disabled={busy} onClick={() => update({ enabled: !enabled })} className={btn}>
-          {enabled ? "Link is on. Turn off" : "Turn on join link"}
+        <button type="button" aria-pressed={enabled} disabled={busy !== null} aria-busy={busy === "toggle"} onClick={() => update({ enabled: !enabled })} className={`inline-flex items-center gap-2 ${btn}`}>
+          {busy === "toggle" && <LoadingSpinner />}
+          {busy === "toggle" ? enabled ? "Turning off link..." : "Turning on link..." : enabled ? "Link is on. Turn off" : "Turn on join link"}
         </button>
         {enabled && (
           <button
             type="button"
-            disabled={busy}
+            disabled={busy !== null}
+            aria-busy={busy === "reset"}
             onClick={() => confirm("The old link will stop working for new students. Create a new one?") && update({ reset: true })}
-            className={btn}
+            className={`inline-flex items-center gap-2 ${btn}`}
           >
-            Create a new link
+            {busy === "reset" && <LoadingSpinner />}
+            {busy === "reset" ? "Creating link..." : "Create a new link"}
           </button>
         )}
       </div>
@@ -84,13 +103,13 @@ export default function SharePanel({
               </label>
               <button
                 type="button"
-                className={`${btn} self-end`}
-                onClick={async () => {
-                  await navigator.clipboard.writeText(code).catch(() => {});
-                  setNote("Course code copied.");
-                }}
+                disabled={copying !== null}
+                aria-busy={copying === "code"}
+                className={`inline-flex items-center gap-2 self-end ${btn}`}
+                onClick={() => copy(code, "code")}
               >
-                Copy code
+                {copying === "code" && <LoadingSpinner />}
+                {copying === "code" ? "Copying..." : "Copy code"}
               </button>
             </div>
           )}
@@ -104,13 +123,13 @@ export default function SharePanel({
             />
             <button
               type="button"
-              className={btn}
-              onClick={async () => {
-                await navigator.clipboard.writeText(link).catch(() => {});
-                setNote("Link copied.");
-              }}
+              disabled={copying !== null}
+              aria-busy={copying === "link"}
+              className={`inline-flex items-center gap-2 ${btn}`}
+              onClick={() => copy(link, "link")}
             >
-              Copy link
+              {copying === "link" && <LoadingSpinner />}
+              {copying === "link" ? "Copying..." : "Copy link"}
             </button>
           </div>
         </div>

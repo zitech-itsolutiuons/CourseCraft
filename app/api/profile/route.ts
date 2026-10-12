@@ -3,14 +3,14 @@ import { z } from "zod";
 import { getUserId } from "@/lib/auth";
 import { connectDB } from "@/lib/db";
 import { UserProfile } from "@/lib/models/UserProfile";
+import { ensureStudentProfile } from "@/lib/studentProfile";
 
 export const runtime = "nodejs";
 
 const ProfileFields = z.object({
   displayName: z.string().trim().min(1, "Enter your name").max(80, "Use 80 characters or fewer for your name"),
-  studentId: z.string().trim().max(40, "Student ID is too long"),
-  program: z.string().trim().max(120, "Program is too long"),
-  level: z.string().trim().max(40, "Level is too long"),
+  department: z.string().trim().min(1, "Enter your department").max(120, "Department is too long"),
+  level: z.string().trim().min(1, "Enter your level").max(40, "Level is too long"),
   bio: z.string().trim().max(500, "About you must be 500 characters or fewer"),
 });
 
@@ -34,8 +34,7 @@ export async function PUT(req: Request) {
   };
   const parsed = ProfileFields.safeParse({
     displayName: value("displayName"),
-    studentId: value("studentId"),
-    program: value("program"),
+    department: value("department"),
     level: value("level"),
     bio: value("bio"),
   });
@@ -51,18 +50,19 @@ export async function PUT(req: Request) {
     avatarData = `data:${contentType};base64,${bytes.toString("base64")}`;
   }
 
+  await ensureStudentProfile(userId);
   await connectDB();
   const fields = parsed.data;
   if (value("removeAvatar") === "true") {
     await UserProfile.findOneAndUpdate(
       { userId },
-      { $set: fields, $unset: { avatarData: 1 } },
+      { $set: fields, $unset: { avatarData: 1, program: 1 } },
       { upsert: true, setDefaultsOnInsert: true }
     );
   } else {
     await UserProfile.findOneAndUpdate(
       { userId },
-      { $set: avatarData ? { ...fields, avatarData } : fields },
+      { $set: avatarData ? { ...fields, avatarData } : fields, $unset: { program: 1 } },
       { upsert: true, setDefaultsOnInsert: true }
     );
   }

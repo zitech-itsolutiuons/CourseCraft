@@ -18,12 +18,15 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
         {params.reason === "inactive" && <p role="status" className="mt-3 border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">You were signed out after 30 minutes of inactivity. Sign in to continue.</p>}
         <p className="mt-3 mb-8 text-sm text-zinc-500">Your courses and quiz results are private to your account.</p>
         <AuthForm mode="signin" callbackUrl={callbackUrl} />
-        <p className="mt-8 text-sm">
-          New here?{" "}
-          <Link href={`/signup?callbackUrl=${encodeURIComponent(callbackUrl)}`} className="underline underline-offset-4">
+        <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-slate-200 pt-5 dark:border-slate-700">
+          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">New here?</p>
+          <Link
+            href={`/signup?callbackUrl=${encodeURIComponent(callbackUrl)}`}
+            className="inline-flex min-h-11 items-center justify-center border-2 border-blue-700 bg-white px-5 py-2 text-sm font-semibold text-blue-800 transition-colors hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 dark:border-blue-400 dark:bg-slate-950 dark:text-blue-300 dark:hover:bg-slate-900"
+          >
             Create an account
           </Link>
-        </p>
+        </div>
       </main>
     </>
   );

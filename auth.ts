@@ -31,12 +31,12 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
     async jwt(params) {
       const token = await authConfig.callbacks.jwt!(params);
       if (!token) return null;
-      const claims = token as typeof token & { role?: "user" | "admin"; lastActivityAt?: number };
+      const claims = token as typeof token & { role?: "user" | "instructor" | "admin"; lastActivityAt?: number };
 
       if (!claims.role && token.sub) {
         await connectDB();
         const user = await User.findById(token.sub).select("role").lean();
-        claims.role = user?.role === "admin" ? "admin" : "user";
+        claims.role = user?.role === "admin" || user?.role === "instructor" ? user.role : "user";
       }
 
       const now = Date.now();

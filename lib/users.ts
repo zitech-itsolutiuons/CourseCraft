@@ -3,6 +3,7 @@ import { connectDB } from "./db";
 import { PlatformSettings } from "./models/PlatformSettings";
 import { SignupCode } from "./models/SignupCode";
 import { User } from "./models/User";
+import { ensureStudentProfile } from "./studentProfile";
 import { dummyHash, hashPassword, verifyPassword } from "./password";
 import { hashSignupCode } from "./signupCodes";
 
@@ -37,6 +38,7 @@ export async function createUser(input: SignUpInput, signupCode: string): Promis
       passwordHash: await hashPassword(input.password),
       ...(signupCodeRecord ? { signupCodeId: signupCodeRecord._id } : {}),
     });
+    await ensureStudentProfile(user.id, input.name);
     return { ok: true, id: user.id };
   } catch (err) {
     if ((err as { code?: number }).code === 11000) return exists; // lost a race with the unique index
@@ -64,5 +66,5 @@ export async function verifyCredentials(email: string, password: string) {
   }
   if (user.failedLogins || user.lockedUntil)
     await User.updateOne({ _id: user._id }, { $set: { failedLogins: 0 }, $unset: { lockedUntil: 1 } });
-  return { id: user.id as string, name: user.name, email: user.email, role: user.role as "user" | "admin" };
+  return { id: user.id as string, name: user.name, email: user.email, role: user.role as "user" | "instructor" | "admin" };
 }

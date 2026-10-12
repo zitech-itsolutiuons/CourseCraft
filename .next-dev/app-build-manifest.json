@@ -16,35 +16,65 @@
       "static/chunks/main-app.js",
       "static/chunks/app/signin/page.js"
     ],
+    "/courses/layout": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/courses/layout.js"
+    ],
     "/courses/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/courses/page.js"
+    ],
+    "/admin/layout": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/admin/layout.js"
+    ],
+    "/admin/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/admin/page.js"
     ],
     "/courses/[id]/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/courses/[id]/page.js"
     ],
-    "/api/auth/[...nextauth]/route": [
+    "/reconstruct/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/auth/[...nextauth]/route.js"
+      "static/chunks/app/reconstruct/page.js"
     ],
-    "/assessments/page": [
+    "/courses/[id]/learn/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/assessments/page.js"
+      "static/chunks/app/courses/[id]/learn/page.js"
     ],
-    "/api/assessments/generate/route": [
+    "/api/chat/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/assessments/generate/route.js"
+      "static/chunks/app/api/chat/route.js"
     ],
-    "/api/assessments/[id]/submit/route": [
+    "/admin/courses/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/assessments/[id]/submit/route.js"
+      "static/chunks/app/admin/courses/page.js"
+    ],
+    "/admin/groups/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/admin/groups/page.js"
+    ],
+    "/admin/users/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/admin/users/page.js"
+    ],
+    "/admin/signup-access/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/admin/signup-access/page.js"
     ]
   }
 }

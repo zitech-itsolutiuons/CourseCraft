@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { after } from "next/server";
 import { isValidObjectId } from "mongoose";
-import { getUserId, isAdmin } from "@/lib/auth";
+import { canCreateCourses, getUserId, isAdmin } from "@/lib/auth";
 import { connectDB } from "@/lib/db";
 import { Course } from "@/lib/models/Course";
 import { buildCourse } from "@/lib/jobs/buildCourse";
@@ -28,13 +28,15 @@ const mimeFor = (f: File) => BY_EXT[f.name.split(".").pop()?.toLowerCase() ?? ""
 export async function POST(req: Request) {
   const ownerId = await getUserId();
   if (!ownerId) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
-  if (!(await isAdmin(ownerId))) return NextResponse.json({ error: "Only admins can upload courses" }, { status: 403 });
+  if (!(await canCreateCourses(ownerId))) return NextResponse.json({ error: "Course creation is available to instructors and admins" }, { status: 403 });
   const form = await req.formData();
   const file = form.get("file");
   const targetCourseId = form.get("courseId");
   if (!(file instanceof File)) return NextResponse.json({ error: "Missing file" }, { status: 400 });
   if (targetCourseId !== null && (typeof targetCourseId !== "string" || !isValidObjectId(targetCourseId)))
     return NextResponse.json({ error: "Invalid course" }, { status: 400 });
+  if (targetCourseId !== null && !(await isAdmin(ownerId)))
+    return NextResponse.json({ error: "Only admins can upload materials to catalog courses" }, { status: 403 });
   if (file.size > MAX_BYTES) return NextResponse.json({ error: "File too large (15 MB max)" }, { status: 413 });
   const mimeType = mimeFor(file);
   if (!Object.values(BY_EXT).includes(mimeType))

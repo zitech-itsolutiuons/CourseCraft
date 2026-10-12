@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import LoadingSpinner from "@/components/ui/LoadingSpinner";
 
 type Props = {
   courseTitle: string;
@@ -46,6 +47,7 @@ export default function ChapterNotes({ courseTitle, chapterId, chapterTitle, ini
   const [note, setNote] = useState(initialNote);
   const [open, setOpen] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>("saved");
+  const [retrying, setRetrying] = useState(false);
   const [exporting, setExporting] = useState<"" | "PDF" | "PNG" | "DOCX">("");
   const [exportError, setExportError] = useState("");
   const noteRef = useRef(initialNote);
@@ -54,6 +56,10 @@ export default function ChapterNotes({ courseTitle, chapterId, chapterTitle, ini
   const dialogRef = useRef<HTMLDialogElement>(null);
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const saveNoteRef = useRef<(content: string) => void>(() => {});
+
+  useEffect(() => {
+    if (saveState !== "saving") setRetrying(false);
+  }, [saveState]);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -205,6 +211,7 @@ export default function ChapterNotes({ courseTitle, chapterId, chapterTitle, ini
   };
 
   const retrySave = () => {
+    setRetrying(true);
     saveNote(noteRef.current, true);
   };
 
@@ -241,8 +248,9 @@ export default function ChapterNotes({ courseTitle, chapterId, chapterTitle, ini
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-500">
         <span>{note.length.toLocaleString()} / 20,000 characters</span>
         {saveState === "error" && (
-          <button type="button" onClick={retrySave} className="font-semibold text-red-700 underline underline-offset-4 dark:text-red-300">
-            Retry saving
+          <button type="button" onClick={retrySave} disabled={retrying} aria-busy={retrying} className="inline-flex items-center gap-2 font-semibold text-red-700 underline underline-offset-4 disabled:cursor-wait dark:text-red-300">
+            {retrying && <LoadingSpinner />}
+            {retrying ? "Retrying..." : "Retry saving"}
           </button>
         )}
       </div>
@@ -254,9 +262,11 @@ export default function ChapterNotes({ courseTitle, chapterId, chapterTitle, ini
               key={format}
               type="button"
               disabled={!noteLines(note).length || Boolean(exporting)}
+              aria-busy={exporting === format}
               onClick={() => void exportNotes(format)}
-              className={`${buttonStyle} ${focus}`}
+              className={`inline-flex items-center gap-2 ${buttonStyle} ${focus}`}
             >
+              {exporting === format && <LoadingSpinner />}
               {exporting === format ? "Preparing…" : format}
             </button>
           ))}
@@ -295,7 +305,7 @@ export default function ChapterNotes({ courseTitle, chapterId, chapterTitle, ini
       </dialog>
       <aside
         aria-label={`Notes for ${chapterTitle}`}
-        className="fixed bottom-0 left-72 top-16 z-30 hidden w-80 flex-col overflow-hidden border-r border-zinc-300 bg-white px-4 text-black dark:border-zinc-800 dark:bg-black dark:text-white xl:flex"
+        className="hidden min-h-0 w-80 shrink-0 flex-col overflow-y-auto border-r border-zinc-300 bg-white px-4 text-black dark:border-zinc-800 dark:bg-black dark:text-white xl:flex"
       >
         {renderEditor("panel")}
       </aside>

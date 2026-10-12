@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import LoadingSpinner from "@/components/ui/LoadingSpinner";
 
 const focus =
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600";
@@ -48,9 +49,13 @@ export default function UploadForm({ courseId }: { courseId?: string } = {}) {
       <button
         type="submit"
         disabled={!file || busy}
+        aria-busy={busy}
         className={`mt-4 border border-blue-600 bg-blue-600 px-5 py-2 text-sm font-medium text-white disabled:opacity-30 hover:bg-blue-700 ${focus}`}
       >
-        {busy ? "Uploading" : courseId ? "Add study materials" : "Create course"}
+        <span className="inline-flex items-center justify-center gap-2">
+          {busy && <LoadingSpinner />}
+          {busy ? "Uploading" : courseId ? "Add study materials" : "Create course"}
+        </span>
       </button>
       {busy && (
         <p role="status" className="mt-3 text-sm text-zinc-500">

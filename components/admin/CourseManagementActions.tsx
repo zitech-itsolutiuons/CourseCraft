@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import {
   archiveCourseAction,
   permanentlyDeleteCourseAction,
@@ -39,14 +40,16 @@ export default function CourseManagementActions({
         {archived ? (
           <form action={restoreAction}>
             {hiddenCourseId(courseId)}
-            <button type="submit" disabled={pending} className={`text-blue-700 hover:text-blue-900 disabled:opacity-50 ${focus}`}>
+            <button type="submit" disabled={pending} aria-busy={restorePending} className={`inline-flex items-center gap-2 text-blue-700 hover:text-blue-900 disabled:opacity-50 ${focus}`}>
+              {restorePending && <LoadingSpinner />}
               {restorePending ? "Restoring…" : "Restore"}
             </button>
           </form>
         ) : (
           <form action={archiveAction}>
             {hiddenCourseId(courseId)}
-            <button type="submit" disabled={pending} className={`text-blue-700 hover:text-blue-900 disabled:opacity-50 ${focus}`}>
+            <button type="submit" disabled={pending} aria-busy={archivePending} className={`inline-flex items-center gap-2 text-blue-700 hover:text-blue-900 disabled:opacity-50 ${focus}`}>
+              {archivePending && <LoadingSpinner />}
               {archivePending ? "Archiving…" : "Archive"}
             </button>
           </form>
@@ -60,7 +63,8 @@ export default function CourseManagementActions({
           }}
         >
           {hiddenCourseId(courseId)}
-          <button type="submit" disabled={pending} className={`text-rose-700 hover:text-rose-900 disabled:opacity-50 ${focus}`}>
+          <button type="submit" disabled={pending} aria-busy={deletePending} className={`inline-flex items-center gap-2 text-rose-700 hover:text-rose-900 disabled:opacity-50 ${focus}`}>
+            {deletePending && <LoadingSpinner />}
             {deletePending ? "Deleting…" : "Delete permanently"}
           </button>
         </form>

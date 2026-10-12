@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import UploadForm from "@/components/UploadForm";
+import PendingSubmitButton from "@/components/ui/PendingSubmitButton";
 import { createComingSoonCourse } from "@/app/admin/actions";
 import { getUserId } from "@/lib/auth";
 import { connectDB } from "@/lib/db";
@@ -72,9 +73,9 @@ export default async function AdminDashboardPage() {
                 <textarea name="description" maxLength={1000} rows={3} className="mt-2 block w-full resize-y border border-slate-300 px-3 py-2 text-sm" />
               </label>
               <p className="text-xs leading-5 text-slate-500">Students will see it in the course list as Coming soon until you add study materials.</p>
-              <button type="submit" className="border border-blue-700 bg-blue-700 px-4 py-2 text-sm font-medium text-white hover:bg-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">
+              <PendingSubmitButton pendingLabel="Creating..." className="border border-blue-700 bg-blue-700 px-4 py-2 text-sm font-medium text-white hover:bg-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">
                 Create coming-soon course
-              </button>
+              </PendingSubmitButton>
             </form>
           </div>
         </div>
@@ -169,7 +170,7 @@ export default async function AdminDashboardPage() {
                     </div>
                   </div>
                   <div className="shrink-0 text-right">
-                    <p className={`text-xs font-medium ${user.role === "admin" ? "text-blue-700" : "text-slate-500"}`}>{user.role}</p>
+                    <p className={`text-xs font-medium ${user.role === "admin" ? "text-blue-700" : user.role === "instructor" ? "text-emerald-700" : "text-slate-500"}`}>{user.role}</p>
                     <p className="mt-1 text-xs tabular-nums text-slate-500">{dateLabel(user.createdAt)}</p>
                   </div>
                 </li>

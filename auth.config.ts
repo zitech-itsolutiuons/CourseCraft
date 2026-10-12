@@ -5,17 +5,17 @@ import Google from "next-auth/providers/google";
 
 declare module "next-auth" {
   interface Session {
-    user: { id: string; role: "user" | "admin" } & DefaultSession["user"];
+    user: { id: string; role: UserRole } & DefaultSession["user"];
   }
 
   interface User {
-    role?: "user" | "admin";
+    role?: UserRole;
   }
 }
 
 import { USER_IDLE_TIMEOUT_MS } from "./lib/sessionPolicy";
 
-type UserRole = "user" | "admin";
+type UserRole = "user" | "instructor" | "admin";
 
 /**
  * Edge-safe half of the Auth.js config. It must not import Mongoose or anything
@@ -64,7 +64,7 @@ export default {
     session({ session, token }) {
       const claims = token as typeof token & { role?: UserRole };
       if (token.sub) session.user.id = token.sub;
-      session.user.role = claims.role === "admin" ? "admin" : "user";
+      session.user.role = claims.role === "admin" || claims.role === "instructor" ? claims.role : "user";
       return session;
     },
   },

@@ -1,187 +1,124 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import Link from "next/link";
 import { isValidObjectId } from "mongoose";
 import { auth } from "@/auth";
 import SiteHeader from "@/components/SiteHeader";
-import BuildProgress from "@/components/BuildProgress";
-import ChapterReader, { type ChapterView } from "@/components/reader/ChapterReader";
-import { connectDB } from "@/lib/db";
-import { isAdmin } from "@/lib/auth";
+import CourseSummary from "@/components/CourseSummary";
 import { getCourseAccess } from "@/lib/access";
-import { Chapter, CourseFinalAssessment, Quiz, StudentNote, StudentProgress } from "@/lib/models/Course";
+import { Chapter } from "@/lib/models/Course";
 import { PlatformSettings } from "@/lib/models/PlatformSettings";
-import { UserProfile } from "@/lib/models/UserProfile";
-import { QUIZ_PASS_THRESHOLD } from "@/lib/quizProgress";
 
 export const dynamic = "force-dynamic";
 
-export default async function CoursePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function CourseDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!isValidObjectId(id)) notFound();
 
   const session = await auth();
   if (!session?.user) redirect("/signin");
-  const userId = session.user.id;
-  const studentName = session.user.name?.trim() || session.user.email?.split("@")[0] || "there";
-  await connectDB();
-  const access = await getCourseAccess(id, userId, { allowCatalogPreview: true });
+  const access = await getCourseAccess(id, session.user.id, { allowCatalogPreview: true });
   if (!access) notFound();
-  const { course } = access;
 
-  if (course.status === "comingSoon") {
-    return (
-      <>
-        <SiteHeader />
-        <main className="mx-auto max-w-3xl px-5 py-16 md:px-10">
-          <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Coming soon</p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight">{course.title}</h1>
-          {course.description && <p className="mt-4 max-w-[65ch] text-sm leading-6 text-slate-600">{course.description}</p>}
-          <p className="mt-5 text-sm leading-6 text-slate-600">Study materials are being prepared. Check back later to study this course.</p>
-          {access.role === "owner" && (
-            <Link href={`/admin/courses/${id}`} className="mt-7 inline-flex border border-blue-700 bg-blue-700 px-4 py-2 text-sm font-medium text-white hover:bg-blue-800">
-              Add study materials
-            </Link>
-          )}
-          <Link href="/courses" className="mt-7 block text-sm font-medium text-blue-700 hover:text-blue-900">Back to courses</Link>
-        </main>
-      </>
-    );
-  }
-
-  const [chapters, quizzes, progress, settings, profile, finalAssessment, savedNotes] = await Promise.all([
-    Chapter.find({ courseId: id }).sort({ index: 1 }).lean(),
-    Quiz.find({ courseId: id }).lean(),
-    StudentProgress.findOne({ userId, courseId: id }).lean(),
-    PlatformSettings.findOne({ key: "platform" }).select("studentQuizQuestionLimit").lean(),
-    UserProfile.findOne({ userId }).select("displayName avatarData").lean(),
-    CourseFinalAssessment.findOne({ courseId: id }).lean(),
-    StudentNote.find({ userId, courseId: id }).select("chapterId content").lean(),
+  const [chapters, settings] = await Promise.all([
+    Chapter.find({ courseId: id }).sort({ index: 1 }).select("title summary").lean(),
+    PlatformSettings.findOne({ key: "platform" })
+      .select("courseSummarizationEnabled")
+      .lean(),
   ]);
-
-  if (course.status === "processing") {
-    if (access.role === "catalog") {
-      return (
-        <>
-          <SiteHeader />
-          <main className="mx-auto max-w-3xl px-5 py-16 md:px-10">
-            <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Coming soon</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight">{course.title}</h1>
-            <p className="mt-5 text-sm leading-6 text-slate-600">Study materials are being prepared. Check back later to study this course.</p>
-            <Link href="/courses" className="mt-7 inline-block text-sm font-medium text-blue-700 hover:text-blue-900">Back to courses</Link>
-          </main>
-        </>
-      );
-    }
-    return (
-      <>
-        <SiteHeader />
-        <main className="mx-auto max-w-3xl px-5 py-16 md:px-10">
-          <BuildProgress
-            courseId={id}
-            initial={{
-              status: "processing",
-              stage: course.stage ?? "queued",
-              title: course.title,
-              totalChapters: course.totalChapters ?? 0,
-              lecturesDone: course.lecturesDone ?? 0,
-              quizzesDone: course.quizzesDone ?? 0,
-            }}
-          />
-        </main>
-      </>
-    );
-  }
-
-  if (course.status === "failed" || chapters.length === 0) {
-    if (access.role === "catalog") {
-      return (
-        <>
-          <SiteHeader />
-          <main className="mx-auto max-w-3xl px-5 py-16 md:px-10">
-            <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Coming soon</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight">{course.title}</h1>
-            <p className="mt-5 text-sm leading-6 text-slate-600">Study materials are being updated. Check back later to study this course.</p>
-            <Link href="/courses" className="mt-7 inline-block text-sm font-medium text-blue-700 hover:text-blue-900">Back to courses</Link>
-          </main>
-        </>
-      );
-    }
-    return (
-      <>
-        <SiteHeader />
-        <main className="mx-auto max-w-3xl px-5 py-16 md:px-10">
-          <h1 className="text-2xl font-semibold">This course could not be built</h1>
-          <p className="mt-4 border-0 border-l border-blue-200 pl-3 text-sm text-blue-700">
-            {course.error ?? "Something went wrong. Upload the document again."}
-          </p>
-          <Link href="/courses" className="mt-6 inline-block text-sm underline underline-offset-4 text-blue-700">
-            Back to your courses
-          </Link>
-        </main>
-      </>
-    );
-  }
-
-  const quizByChapter = new Map(quizzes.map((q) => [String(q.chapterId), q.questions]));
-  const quizQuestionLimit = access.role === "owner"
-    ? 15
-    : Math.min(15, Math.max(1, settings?.studentQuizQuestionLimit ?? 15));
-  const views: ChapterView[] = chapters.map((c) => ({
-    id: String(c._id),
-    index: c.index,
-    title: c.title,
-    contentMd: c.contentMd,
-    videoUrl: c.videoUrl ?? "",
-    quiz: (quizByChapter.get(String(c._id)) ?? []).slice(0, quizQuestionLimit).map((q) => ({
-      question: q.question,
-      options: [...q.options],
-      correctIndex: q.correctIndex,
-      explanation: q.explanation,
-    })),
-  }));
+  const { course } = access;
+  const canLearn = course.status === "ready" && chapters.length > 0;
+  const statusLabel = course.status === "comingSoon"
+    ? "Coming soon"
+    : course.status === "processing"
+      ? "Preparing materials"
+      : course.status === "failed"
+        ? "Materials need attention"
+        : "Ready to learn";
 
   return (
-    <ChapterReader
-      courseId={id}
-      courseTitle={course.title}
-      studentName={profile?.displayName || studentName}
-      studentAvatar={profile?.avatarData || ""}
-      isOwner={access.role === "owner"}
-      isAdmin={await isAdmin(userId)}
-      chapters={views}
-      completedSections={Object.fromEntries(
-        (progress?.completedSections ?? []).reduce<Map<string, string[]>>((byChapter, section) => {
-          const chapterId = String(section.chapterId);
-          byChapter.set(chapterId, [...(byChapter.get(chapterId) ?? []), section.sectionId]);
-          return byChapter;
-        }, new Map())
-      )}
-      notesByChapter={Object.fromEntries(savedNotes.map((note) => [String(note.chapterId), note.content]))}
-      finalAssessment={finalAssessment ? {
-        objectiveQuestions: finalAssessment.objectiveQuestions.map((question) => ({
-          question: question.question,
-          options: [...question.options],
-          correctIndex: question.correctIndex,
-          explanation: question.explanation,
-        })),
-        theoryQuestions: finalAssessment.theoryQuestions.map((question) => ({
-          question: question.question,
-          sampleAnswer: question.sampleAnswer,
-          gradingPoints: [...question.gradingPoints],
-        })),
-      } : null}
-      completedIds={[
-        ...new Set(
-          (progress?.quizAttempts ?? [])
-            .filter((attempt) =>
-              typeof attempt.score === "number" &&
-              typeof attempt.total === "number" &&
-              attempt.total > 0 &&
-              attempt.score / attempt.total >= QUIZ_PASS_THRESHOLD
-            )
-            .map((attempt) => String(attempt.chapterId))
-        ),
-      ]}
-    />
+    <>
+      <SiteHeader />
+      <main className="mx-auto w-full max-w-5xl min-w-0 space-y-8 px-3 py-7 sm:space-y-10 sm:px-6 sm:py-10 lg:px-8">
+        <div>
+          <Link href="/courses" className="text-sm font-medium text-blue-700 hover:text-blue-900 dark:text-blue-300 dark:hover:text-blue-200">
+            Back to your courses
+          </Link>
+          <div className="mt-6 flex flex-col items-start justify-between gap-5 border-b border-slate-200 pb-7 sm:flex-row sm:items-end dark:border-slate-800">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">Course details</p>
+              <h1 className="mt-2 break-words text-3xl font-semibold tracking-tight text-slate-950 [overflow-wrap:anywhere] dark:text-white sm:text-4xl">
+                {course.title}
+              </h1>
+              <p className="mt-3 max-w-[65ch] whitespace-pre-wrap break-words text-sm leading-6 text-slate-600 dark:text-slate-300">
+                {course.description || "Explore the course outline and review its learning materials."}
+              </p>
+            </div>
+            <div className="flex w-full shrink-0 flex-col gap-3 sm:w-auto sm:flex-row">
+              {canLearn ? (
+                <Link
+                  href={`/courses/${id}/learn`}
+                  className="inline-flex min-h-11 items-center justify-center border border-blue-700 bg-blue-700 px-5 text-sm font-semibold text-white hover:bg-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
+                >
+                  Proceed to learn
+                </Link>
+              ) : access.role === "owner" ? (
+                <Link
+                  href={`/admin/courses/${id}`}
+                  className="inline-flex min-h-11 items-center justify-center border border-blue-700 bg-blue-700 px-5 text-sm font-semibold text-white hover:bg-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
+                >
+                  Manage materials
+                </Link>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        <section aria-label="Course information" className="flex flex-wrap gap-x-8 gap-y-4 border-b border-slate-200 pb-6 text-sm dark:border-slate-800">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Status</p>
+            <p className="mt-1 font-medium text-slate-900 dark:text-slate-100">{statusLabel}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Chapters</p>
+            <p className="mt-1 font-medium tabular-nums text-slate-900 dark:text-slate-100">{chapters.length}</p>
+          </div>
+        </section>
+
+        {canLearn && (
+          <section aria-label="Course summary" className="border-b border-slate-200 pb-6 dark:border-slate-800">
+            <CourseSummary courseId={id} enabled={Boolean(settings?.courseSummarizationEnabled)} />
+          </section>
+        )}
+
+        {chapters.length > 0 ? (
+          <section aria-labelledby="course-outline-heading">
+            <h2 id="course-outline-heading" className="text-xl font-semibold text-slate-950 dark:text-white">Course outline</h2>
+            <ol className="mt-4 divide-y divide-slate-200 border-y border-slate-200 dark:divide-slate-800 dark:border-slate-800">
+              {chapters.map((chapter, index) => (
+                <li key={String(chapter._id)} className="flex gap-4 py-4">
+                  <span className="mt-0.5 w-8 shrink-0 text-sm font-semibold tabular-nums text-blue-700 dark:text-blue-300">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className="break-words font-medium text-slate-900 [overflow-wrap:anywhere] dark:text-slate-100">{chapter.title}</h3>
+                    {chapter.summary && (
+                      <p className="mt-1 break-words text-sm leading-6 text-slate-600 dark:text-slate-300">{chapter.summary}</p>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </section>
+        ) : (
+          <p className="border-y border-slate-200 py-6 text-sm leading-6 text-slate-600 dark:border-slate-800 dark:text-slate-300">
+            {course.status === "processing"
+              ? "Course materials are being prepared. The outline will appear here when they are ready."
+              : course.status === "failed"
+                ? course.error || "Course materials could not be prepared yet."
+                : "The course outline will appear here when study materials are available."}
+          </p>
+        )}
+      </main>
+    </>
   );
 }

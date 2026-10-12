@@ -1,6 +1,7 @@
 import { connectDB } from "@/lib/db";
 import { defaultHomepageContent, HomepageContent } from "@/lib/models/HomepageContent";
 import { saveHomepageContent } from "@/app/admin/actions";
+import PendingSubmitButton from "@/components/ui/PendingSubmitButton";
 
 export const dynamic = "force-dynamic";
 
@@ -114,9 +115,9 @@ export default async function AdminHomepagePage({ searchParams }: { searchParams
           <a href="/" target="_blank" rel="noreferrer" className="text-sm font-medium text-blue-700 hover:text-blue-900">
             Preview home page
           </a>
-          <button type="submit" className="min-h-11 border border-blue-700 bg-blue-700 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">
+          <PendingSubmitButton pendingLabel="Saving..." className="min-h-11 border border-blue-700 bg-blue-700 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">
             Save home page
-          </button>
+          </PendingSubmitButton>
         </div>
       </form>
     </div>

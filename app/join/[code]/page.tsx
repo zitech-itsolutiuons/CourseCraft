@@ -1,10 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { canCreateCourses } from "@/lib/auth";
 import SiteHeader from "@/components/SiteHeader";
 import { connectDB } from "@/lib/db";
 import { joinByCode } from "@/lib/courseOps";
 import { Course, CourseRestriction, StudentProgress } from "@/lib/models/Course";
+import { ensureStudentProfile, hasRequiredStudentDetails, studentProfilePath } from "@/lib/studentProfile";
+import PendingSubmitButton from "@/components/ui/PendingSubmitButton";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +16,10 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
   const session = await auth();
   if (!session?.user) redirect(`/signin?callbackUrl=${encodeURIComponent(`/join/${code}`)}`);
   const user = session.user;
+  if (!(await canCreateCourses(user.id))) {
+    const profile = await ensureStudentProfile(user.id, user.name ?? "Student");
+    if (!hasRequiredStudentDetails(profile)) redirect(studentProfilePath(`/join/${code}`));
+  }
 
   await connectDB();
   const course = await Course.findOne({ shareCode: code, sharingEnabled: true, status: "ready", archivedAt: null }).lean();
@@ -55,6 +62,10 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
     "use server";
     const s = await auth();
     if (!s?.user) redirect("/signin");
+    if (!(await canCreateCourses(s.user.id))) {
+      const profile = await ensureStudentProfile(s.user.id, s.user.name ?? "Student");
+      if (!hasRequiredStudentDetails(profile)) redirect(studentProfilePath(`/join/${code}`));
+    }
     const joined = await joinByCode(code, { id: s.user.id, name: s.user.name, email: s.user.email });
     redirect(joined ? `/courses/${joined._id}` : `/join/${code}`);
   }
@@ -70,12 +81,12 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
           The instructor will see your name and email, which chapters you finish, your quiz scores and how often you use the assistant.
         </p>
         <form action={join} className="mt-8">
-          <button
-            type="submit"
+          <PendingSubmitButton
+            pendingLabel="Joining..."
             className="border border-blue-600 bg-blue-600 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
           >
             Join course
-          </button>
+          </PendingSubmitButton>
         </form>
       </main>
     </>

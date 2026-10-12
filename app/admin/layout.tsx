@@ -11,9 +11,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (!(await isAdmin(userId))) redirect("/courses");
 
   return (
-    <>
+    <div className="admin-dashboard-frame dashboard-frame min-w-0 overflow-x-clip">
       <SiteHeader />
-      <main className="mx-auto max-w-6xl px-5 pb-16 pt-9 md:px-10">
+      <main className="mx-auto w-full max-w-[1440px] min-w-0 px-3 pb-12 pt-6 sm:px-5 sm:pb-16 sm:pt-8 md:px-8 xl:px-10">
         <div className="flex flex-col justify-between gap-5 border-b border-slate-200 pb-7 sm:flex-row sm:items-end">
           <div>
             <p className="text-xs font-semibold uppercase text-blue-700">Course Craft / Administration</p>
@@ -25,9 +25,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             Admin access
           </div>
         </div>
-        <AdminNav />
-        {children}
+        <div className="mt-6 grid min-w-0 items-start gap-6 sm:mt-8 lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-8">
+          <AdminNav />
+          <div className="min-w-0">{children}</div>
+        </div>
       </main>
-    </>
+    </div>
   );
 }

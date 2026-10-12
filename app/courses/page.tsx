@@ -4,8 +4,9 @@ import { auth } from "@/auth";
 import SiteHeader from "@/components/SiteHeader";
 import UploadForm from "@/components/UploadForm";
 import { joinCourseByCode } from "@/app/courses/actions";
+import PendingSubmitButton from "@/components/ui/PendingSubmitButton";
 import { connectDB } from "@/lib/db";
-import { getUserId, isAdmin } from "@/lib/auth";
+import { canCreateCourses, getUserId } from "@/lib/auth";
 import { Course, CourseGroupSettings, CourseRestriction, StudentProgress } from "@/lib/models/Course";
 import { UserProfile } from "@/lib/models/UserProfile";
 
@@ -61,7 +62,7 @@ export default async function CoursesPage({ searchParams }: { searchParams: Prom
   if (!session?.user) redirect("/signin");
   const userId = session.user.id;
   await connectDB();
-  const canUpload = await isAdmin(userId);
+  const canUpload = await canCreateCourses(userId);
 
   const [restrictions, groupCodeSettings, profile] = await Promise.all([
     CourseRestriction.find({ userId }).select("courseId").lean(),
@@ -200,9 +201,9 @@ export default async function CoursesPage({ searchParams }: { searchParams: Prom
                   className="mt-2 block min-h-11 w-full min-w-0 border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
                 />
               </label>
-              <button type="submit" className="min-h-11 w-full border border-blue-700 bg-blue-700 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">
+              <PendingSubmitButton pendingLabel="Joining..." className="min-h-11 w-full border border-blue-700 bg-blue-700 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">
                 Join course
-              </button>
+              </PendingSubmitButton>
             </form>
           </aside>
         </div>

@@ -1,10 +1,14 @@
 import { connectDB } from "./db";
 import { Chapter, Quiz, StudentProgress } from "./models/Course";
+import { UserProfile } from "./models/UserProfile";
 
 export type ProgressRow = {
   userId: string;
   displayName?: string | null;
   email?: string | null;
+  studentId?: string | null;
+  department?: string | null;
+  level?: string | null;
   completedChapterIds: string[];
   quizAttempts: { chapterId: string; score: number; total: number; answers: number[]; at: Date }[];
   chatCounts: Record<string, number>;
@@ -80,6 +84,9 @@ export function computeAnalytics(a: {
       userId: s.userId,
       name: s.displayName || null,
       email: s.email || null,
+      studentId: s.studentId || null,
+      department: s.department || null,
+      level: s.level || null,
       completed: s.completedChapterIds.filter((id) => ids.has(id)).length,
       avgScore: mean(Object.values(best[i])),
       assistantMessages: s.assistantMessages ?? 0,
@@ -109,6 +116,10 @@ export async function loadAnalytics(courseId: string, ownerId: string) {
     Quiz.find({ courseId }).select("chapterId questions.question questions.correctIndex updatedAt").lean(),
     StudentProgress.find({ courseId }).limit(1000).lean(),
   ]);
+  const profiles = await UserProfile.find({ userId: { $in: progress.map((p) => p.userId) } })
+    .select("userId studentId department level")
+    .lean();
+  const profilesByUserId = new Map(profiles.map((profile) => [profile.userId, profile]));
 
   return computeAnalytics({
     ownerId,
@@ -126,6 +137,9 @@ export async function loadAnalytics(courseId: string, ownerId: string) {
       userId: p.userId,
       displayName: p.displayName,
       email: p.email,
+      studentId: profilesByUserId.get(p.userId)?.studentId,
+      department: profilesByUserId.get(p.userId)?.department || profilesByUserId.get(p.userId)?.program,
+      level: profilesByUserId.get(p.userId)?.level,
       completedChapterIds: (p.completedChapterIds ?? []).map(String),
       quizAttempts: (p.quizAttempts ?? []).map((t) => ({
         chapterId: String(t.chapterId),

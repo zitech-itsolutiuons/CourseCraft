@@ -33,5 +33,7 @@ export async function signUpAction(_prev: FormState, fd: FormData): Promise<Form
   const created = await createUser(parsed.data, text(fd, "signupCode"));
   if (!created.ok) return { error: created.error };
 
-  return credentialsSignIn(parsed.data.email, parsed.data.password, safePath(text(fd, "callbackUrl")));
+  const callbackUrl = safePath(text(fd, "callbackUrl"));
+  const profileUrl = `/profile?onboarding=required&callbackUrl=${encodeURIComponent(callbackUrl)}`;
+  return credentialsSignIn(parsed.data.email, parsed.data.password, profileUrl);
 }

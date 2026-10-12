@@ -1,4 +1,5 @@
 import { signIn } from "@/auth";
+import PendingSubmitButton from "@/components/ui/PendingSubmitButton";
 
 const btn =
   "w-full border border-blue-200 bg-white px-4 py-3 text-left text-sm font-medium text-blue-700 hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600";
@@ -21,9 +22,9 @@ export default function OAuthButtons({ redirectTo }: { redirectTo: string }) {
             await signIn(p.id, { redirectTo });
           }}
         >
-          <button type="submit" className={btn}>
+          <PendingSubmitButton pendingLabel="Connecting..." className={btn}>
             {p.label}
-          </button>
+          </PendingSubmitButton>
         </form>
       ))}
     </div>

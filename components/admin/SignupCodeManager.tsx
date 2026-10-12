@@ -7,6 +7,8 @@ import {
   saveSignupCodeRequirementAction,
   type SignupCodeActionState,
 } from "@/app/admin/actions";
+import LoadingSpinner from "@/components/ui/LoadingSpinner";
+import PendingSubmitButton from "@/components/ui/PendingSubmitButton";
 
 const focus = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700";
 
@@ -41,9 +43,9 @@ export default function SignupCodeManager({
             <span className="mt-1 block text-xs leading-5 text-slate-500">When off, anyone can create an account without a code.</span>
           </span>
         </label>
-        <button type="submit" disabled={settingsPending} className={`w-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:cursor-wait disabled:opacity-50 sm:w-auto ${focus}`}>
-          {settingsPending ? "Saving changes..." : "Save changes"}
-        </button>
+        <PendingSubmitButton pendingLabel="Saving changes..." className={`w-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:cursor-wait disabled:opacity-50 sm:w-auto ${focus}`}>
+          Save changes
+        </PendingSubmitButton>
       </form>
       {settingsState.success && <p role="status" className="-mt-3 text-sm text-emerald-700">{settingsState.success}</p>}
       {settingsState.error && <p role="alert" className="-mt-3 text-sm text-rose-700">{settingsState.error}</p>}
@@ -59,9 +61,9 @@ export default function SignupCodeManager({
               Number of codes
               <input type="number" name="quantity" min={1} max={25} defaultValue={1} required className={`mt-1 block w-24 border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 ${focus}`} />
             </label>
-            <button type="submit" disabled={generatePending} className={`border border-blue-700 bg-blue-700 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-800 disabled:cursor-wait disabled:opacity-50 ${focus}`}>
-              {generatePending ? "Generating..." : "Generate codes"}
-            </button>
+            <PendingSubmitButton pendingLabel="Generating..." className={`border border-blue-700 bg-blue-700 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-800 disabled:cursor-wait disabled:opacity-50 ${focus}`}>
+              Generate codes
+            </PendingSubmitButton>
           </div>
         </form>
       </div>
@@ -97,7 +99,7 @@ export default function SignupCodeManager({
                   {code.active && (
                     <form action={revokeSignupCodeAction}>
                       <input type="hidden" name="codeId" value={code.id} />
-                      <button type="submit" className={`border border-rose-200 px-3 py-2 text-sm font-medium text-rose-800 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-900 ${focus}`}>Revoke code</button>
+                      <PendingSubmitButton pendingLabel="Revoking..." className={`border border-rose-200 px-3 py-2 text-sm font-medium text-rose-800 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-900 ${focus}`}>Revoke code</PendingSubmitButton>
                     </form>
                   )}
                 </div>
@@ -131,20 +133,26 @@ export default function SignupCodeManager({
 
 function CopyCodeButton({ code }: { code: string }) {
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
+  const [copying, setCopying] = useState(false);
 
   async function copyCode() {
+    if (copying) return;
+    setCopying(true);
     try {
       await navigator.clipboard.writeText(code);
       setCopyState("copied");
     } catch {
       setCopyState("error");
+    } finally {
+      setCopying(false);
     }
   }
 
   return (
     <span className="inline-flex items-center gap-2">
-      <button type="button" onClick={copyCode} className={`border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 ${focus}`}>
-        {copyState === "copied" ? "Copied" : "Copy"}
+      <button type="button" onClick={copyCode} disabled={copying} aria-busy={copying} className={`inline-flex items-center gap-2 border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-wait ${focus}`}>
+        {copying && <LoadingSpinner />}
+        {copying ? "Copying..." : copyState === "copied" ? "Copied" : "Copy"}
       </button>
       {copyState === "error" && <span role="status" className="text-xs text-rose-700">Could not copy</span>}
     </span>

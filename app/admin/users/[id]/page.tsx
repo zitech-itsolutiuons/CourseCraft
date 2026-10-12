@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Types } from "mongoose";
 import { updateCourseAccess } from "@/app/admin/users/actions";
+import PendingSubmitButton from "@/components/ui/PendingSubmitButton";
 import { connectDB } from "@/lib/db";
 import { Course, CourseRestriction } from "@/lib/models/Course";
 import { User } from "@/lib/models/User";
@@ -86,12 +87,12 @@ export default async function UserCourseAccessPage({
                         <input type="hidden" name="userId" value={id} />
                         <input type="hidden" name="courseId" value={courseId} />
                         <input type="hidden" name="mode" value={restricted ? "restore" : "restrict"} />
-                        <button
-                          type="submit"
+                        <PendingSubmitButton
+                          pendingLabel="Updating..."
                           className={`whitespace-nowrap border px-3 py-1.5 text-xs font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${restricted ? "border-blue-200 text-blue-800 hover:bg-blue-50" : "border-rose-200 text-rose-700 hover:bg-rose-50"}`}
                         >
                           {restricted ? "Restore access" : "Restrict access"}
-                        </button>
+                        </PendingSubmitButton>
                       </form>
                     </td>
                   </tr>

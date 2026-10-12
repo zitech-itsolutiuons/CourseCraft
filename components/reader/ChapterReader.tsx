@@ -5,6 +5,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { QUIZ_PASS_THRESHOLD } from "@/lib/quizProgress";
 import { CHAPTER_VIDEO_MARKER, resolveChapterVideo, splitChapterVideo } from "@/lib/chapterVideo";
+import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import { parseChapterSections } from "@/lib/chapterSections";
 import SessionActivityTracker from "@/components/SessionActivityTracker";
 import ChapterNotes from "@/components/reader/ChapterNotes";
@@ -40,9 +41,9 @@ export default function ChapterReader({ courseId, courseTitle, studentName, stud
   const [sectionProgress, setSectionProgress] = useState(completedSections);
   const [notesByChapter, setNotesByChapter] = useState(initialNotes);
   const [expandedIds, setExpandedIds] = useState(() => new Set([chapters[0].id]));
-  const [activeSectionId, setActiveSectionId] = useState("");
-  const [pendingSectionId, setPendingSectionId] = useState<string | null>(null);
+  const [activeSectionId, setActiveSectionId] = useState(() => parseChapterSections(chapters[0].contentMd)[0]?.id ?? "");
   const [progressError, setProgressError] = useState(false);
+  const [retryingProgress, setRetryingProgress] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
   const recordedSections = useRef(new Set(Object.entries(completedSections).flatMap(([chapterId, sectionIds]) => sectionIds.map((sectionId) => `${chapterId}:${sectionId}`))));
@@ -51,17 +52,19 @@ export default function ChapterReader({ courseId, courseTitle, studentName, stud
   const pos = chapters.findIndex((c) => c.id === activeId);
   const chapter = chapters[pos];
   const chapterSections = useMemo(() => parseChapterSections(chapter.contentMd), [chapter.id, chapter.contentMd]);
+  const selectedSectionIndex = Math.max(0, chapterSections.findIndex((section) => section.id === activeSectionId));
+  const selectedSection = chapterSections[selectedSectionIndex];
   const allChapterQuizzesPassed = chapters.every((item) => item.quiz.length === 0 || done.has(item.id));
 
-  const saveSectionProgress = (chapterId: string, sectionId: string) => {
+  const saveSectionProgress = (chapterId: string, sectionId: string): Promise<void> => {
     const key = `${chapterId}:${sectionId}`;
-    if (recordedSections.current.has(key)) return;
+    if (recordedSections.current.has(key)) return Promise.resolve();
     recordedSections.current.add(key);
     setSectionProgress((previous) => ({
       ...previous,
       [chapterId]: [...new Set([...(previous[chapterId] ?? []), sectionId])],
     }));
-    void fetch("/api/progress/sections", {
+    return fetch("/api/progress/sections", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ courseId, chapterId, sectionId }),
@@ -75,14 +78,19 @@ export default function ChapterReader({ courseId, courseTitle, studentName, stud
     });
   };
 
-  const retrySectionProgress = () => {
+  const retrySectionProgress = async () => {
     const retry = [...failedSections.current];
     failedSections.current.clear();
     setProgressError(false);
-    for (const key of retry) {
-      const separator = key.indexOf(":");
-      recordedSections.current.delete(key);
-      saveSectionProgress(key.slice(0, separator), key.slice(separator + 1));
+    setRetryingProgress(true);
+    try {
+      await Promise.all(retry.map((key) => {
+        const separator = key.indexOf(":");
+        recordedSections.current.delete(key);
+        return saveSectionProgress(key.slice(0, separator), key.slice(separator + 1));
+      }));
+    } finally {
+      setRetryingProgress(false);
     }
   };
 
@@ -92,31 +100,38 @@ export default function ChapterReader({ courseId, courseTitle, studentName, stud
     return Boolean(previousChapter && (previousChapter.quiz.length === 0 || done.has(previousChapter.id)));
   };
 
-  const go = (id: string) => {
-    const targetIndex = chapters.findIndex((c) => c.id === id);
-    if (targetIndex < 0 || !isChapterUnlocked(targetIndex)) return;
-    setActiveId(id);
-    setActiveSectionId("");
-    setExpandedIds((previous) => new Set(previous).add(id));
-    setPendingSectionId(null);
+  const goToSection = (chapterIndex: number, sectionIndex: number) => {
+    const target = chapters[chapterIndex];
+    const targetSection = target && parseChapterSections(target.contentMd)[sectionIndex];
+    if (!target || !targetSection || !isChapterUnlocked(chapterIndex)) return;
+    setActiveId(target.id);
+    setActiveSectionId(targetSection.id);
+    setExpandedIds((previous) => new Set(previous).add(target.id));
     setNavOpen(false);
     mainRef.current?.scrollTo({ top: 0 });
   };
 
-  const selectSection = (chapterId: string, sectionId: string) => {
-    setExpandedIds((previous) => new Set(previous).add(chapterId));
-    setNavOpen(false);
-    if (chapterId !== activeId) {
-      setActiveId(chapterId);
-      setActiveSectionId(sectionId);
-      setPendingSectionId(sectionId);
-      mainRef.current?.scrollTo({ top: 0 });
-      return;
+  const go = (id: string) => {
+    const targetIndex = chapters.findIndex((c) => c.id === id);
+    if (targetIndex >= 0) goToSection(targetIndex, 0);
+  };
+
+  const moveSubsection = (direction: -1 | 1) => {
+    if (direction < 0 && selectedSectionIndex > 0) {
+      goToSection(pos, selectedSectionIndex - 1);
+    } else if (direction > 0 && selectedSectionIndex < chapterSections.length - 1) {
+      goToSection(pos, selectedSectionIndex + 1);
+    } else if (direction < 0 && pos > 0) {
+      goToSection(pos - 1, parseChapterSections(chapters[pos - 1].contentMd).length - 1);
+    } else if (direction > 0 && isChapterUnlocked(pos + 1)) {
+      goToSection(pos + 1, 0);
     }
-    document.getElementById(`${chapterId}-${sectionId}`)?.scrollIntoView({
-      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
-      block: "start",
-    });
+  };
+
+  const selectSection = (chapterId: string, sectionId: string) => {
+    const chapterIndex = chapters.findIndex((item) => item.id === chapterId);
+    const sectionIndex = parseChapterSections(chapters[chapterIndex]?.contentMd ?? "").findIndex((section) => section.id === sectionId);
+    if (chapterIndex >= 0 && sectionIndex >= 0) goToSection(chapterIndex, sectionIndex);
   };
 
   useEffect(() => {
@@ -140,24 +155,13 @@ export default function ChapterReader({ courseId, courseTitle, studentName, stud
     return () => observer.disconnect();
   }, [chapter.id, chapterSections, courseId]);
 
-  useEffect(() => {
-    if (!pendingSectionId) return;
-    const target = document.getElementById(`${chapter.id}-${pendingSectionId}`);
-    if (!target) return;
-    target.scrollIntoView({
-      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
-      block: "start",
-    });
-    setPendingSectionId(null);
-  }, [chapter.id, pendingSectionId]);
-
-  function handleQuizDone(score: number, total: number, answers: number[]) {
+  function handleQuizDone(score: number, total: number, answers: number[]): Promise<void> {
     if (score / total >= QUIZ_PASS_THRESHOLD) setDone((p) => new Set(p).add(chapter.id));
-    fetch("/api/progress", {
+    return fetch("/api/progress", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ courseId, chapterId: chapter.id, score, total, answers }),
-    }).catch(() => {});
+    }).then(() => {}).catch(() => {});
   }
 
   return (
@@ -188,18 +192,11 @@ export default function ChapterReader({ courseId, courseTitle, studentName, stud
             <button
               onClick={() => setNavOpen((o) => !o)}
               aria-expanded={navOpen}
-              className={`${line} px-2 py-1 text-black dark:text-white md:hidden ${focus}`}
+              aria-controls="chapter-navigation"
+              className={`${line} px-3 py-1.5 text-black dark:text-white ${focus}`}
             >
               Chapters
             </button>
-            <ChapterNotes
-              key={chapter.id}
-              courseTitle={courseTitle}
-              chapterId={chapter.id}
-              chapterTitle={chapter.title}
-              initialNote={notesByChapter[chapter.id] ?? ""}
-              onNoteChange={(content) => setNotesByChapter((previous) => ({ ...previous, [chapter.id]: content }))}
-            />
           </div>
         </div>
         {/* One segment per chapter: filled = completed */}
@@ -210,11 +207,21 @@ export default function ChapterReader({ courseId, courseTitle, studentName, stud
         </div>
       </header>
 
-      <div className="relative flex min-h-0 flex-1">
+      <div className="relative flex min-h-0 flex-1 flex-col xl:flex-row">
+        {navOpen && (
+          <button
+            type="button"
+            aria-label="Close chapter navigation"
+            onClick={() => setNavOpen(false)}
+            className="absolute inset-0 z-20 cursor-default bg-black/20 dark:bg-white/10"
+          />
+        )}
         <nav
+          id="chapter-navigation"
           aria-label="Chapters"
-          className={`absolute inset-y-0 left-0 z-30 w-72 overflow-y-auto border-0 border-r ${line} bg-white dark:bg-black
-            transition-[transform,visibility] motion-reduce:transition-none md:static md:visible md:translate-x-0
+          className={`absolute inset-y-0 left-0 z-30 w-[min(20rem,88vw)] shrink-0 overflow-y-auto border-0 border-r ${line} bg-white shadow-xl shadow-black/10 dark:bg-black dark:shadow-black/40
+            transition-[transform,visibility] duration-200 ease-out motion-reduce:transition-none
+            xl:static xl:inset-auto xl:z-auto xl:flex xl:w-72 xl:translate-x-0 xl:visible xl:shadow-none
             ${navOpen ? "visible translate-x-0" : "invisible -translate-x-full"}`}
         >
           <ol>
@@ -284,7 +291,7 @@ export default function ChapterReader({ courseId, courseTitle, studentName, stud
                   </div>
                   {expanded && !locked && (
                     <ol className={`border-b ${soft} py-1 ${active ? "bg-zinc-50 dark:bg-zinc-950" : ""}`}>
-                      {sections.map((section) => {
+                      {sections.map((section, sectionIndex) => {
                         const completed = (sectionProgress[c.id] ?? []).includes(section.id);
                         const selected = active && activeSectionId === section.id;
                         return (
@@ -293,11 +300,25 @@ export default function ChapterReader({ courseId, courseTitle, studentName, stud
                               type="button"
                               onClick={() => selectSection(c.id, section.id)}
                               aria-current={selected ? "location" : undefined}
-                              className={`flex w-full items-center gap-2 py-2 pl-10 pr-4 text-left text-xs ${focus}
-                                ${selected ? "font-semibold text-blue-800 dark:text-blue-200" : "text-zinc-600 hover:text-black dark:text-zinc-400 dark:hover:text-white"}`}
+                              aria-label={`${i + 1}.${sectionIndex + 1}, ${section.title}${selected ? ", current section" : ""}`}
+                              className={`flex min-h-11 w-full items-start gap-2 rounded-md px-3 py-2 text-left text-xs transition-colors ${focus}
+                                ${selected
+                                  ? "bg-blue-50 font-semibold text-blue-950 ring-1 ring-inset ring-blue-200 dark:bg-blue-950/60 dark:text-blue-100 dark:ring-blue-900"
+                                  : "text-zinc-600 hover:bg-zinc-100 hover:text-black dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-white"}`}
                             >
-                              <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${completed ? "bg-emerald-600 dark:bg-emerald-400" : selected ? "bg-blue-700 dark:bg-blue-300" : "bg-zinc-300 dark:bg-zinc-700"}`} />
-                              <span className="line-clamp-2">{section.title}</span>
+                              <span
+                                aria-hidden="true"
+                                className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
+                                  completed ? "bg-emerald-600 dark:bg-emerald-400" : selected ? "bg-blue-700 dark:bg-blue-300" : "bg-zinc-300 dark:bg-zinc-700"
+                                }`}
+                              />
+                              <span className={`w-9 shrink-0 tabular-nums ${selected ? "font-semibold text-blue-800 dark:text-blue-200" : "text-zinc-500 dark:text-zinc-400"}`}>
+                                {i + 1}.{sectionIndex + 1}
+                              </span>
+                              <span className="min-w-0 flex-1">
+                                <span className="block line-clamp-2 leading-5">{section.title}</span>
+                                {selected && <span className="mt-1 block text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-700 dark:text-blue-300">Current section</span>}
+                              </span>
                             </button>
                           </li>
                         );
@@ -310,42 +331,80 @@ export default function ChapterReader({ courseId, courseTitle, studentName, stud
           </ol>
         </nav>
 
-        <main ref={mainRef} className="min-w-0 flex-1 overflow-y-auto px-5 py-10 md:px-12 xl:ml-80">
+        <ChapterNotes
+          key={chapter.id}
+          courseTitle={courseTitle}
+          chapterId={chapter.id}
+          chapterTitle={chapter.title}
+          initialNote={notesByChapter[chapter.id] ?? ""}
+          onNoteChange={(content) => setNotesByChapter((previous) => ({ ...previous, [chapter.id]: content }))}
+        />
+
+        <main ref={mainRef} className="min-w-0 flex-1 overflow-y-auto px-5 py-8 sm:px-8 md:px-12 md:py-12 xl:px-16">
           <article
-            className="prose prose-zinc mx-auto max-w-[68ch] font-serif dark:prose-invert
+            className="prose prose-zinc mx-auto w-full max-w-6xl font-serif dark:prose-invert prose-p:max-w-[75ch] prose-li:max-w-[75ch]
               prose-headings:font-sans prose-headings:font-semibold prose-a:underline
               prose-img:mx-auto prose-img:max-h-[70vh] prose-img:w-full prose-img:object-contain prose-img:border prose-img:border-zinc-200 dark:prose-img:border-zinc-800
               prose-code:before:content-none prose-code:after:content-none prose-pre:rounded-none prose-pre:border prose-pre:border-zinc-300 dark:prose-pre:border-zinc-800"
           >
-            <h1>{chapter.title}</h1>
+            <h1 className="mb-8">{chapter.title}</h1>
             {chapterSections.map((section, index) => (
-              <section
-                key={section.id}
-                id={`${chapter.id}-${section.id}`}
-                className="scroll-mt-6"
-              >
-                <h2 data-section-heading={section.id}>{section.title}</h2>
-                {splitChapterVideo(
-                  section.contentMd,
-                  chapter.contentMd.includes(CHAPTER_VIDEO_MARKER) || index === 0 ? chapter.videoUrl : ""
-                ).map((block) => block.kind === "video"
-                  ? <ChapterVideo key={block.key} url={chapter.videoUrl!} title={chapter.title} />
-                  : <ReactMarkdown key={block.key} remarkPlugins={[remarkGfm]}>{block.content}</ReactMarkdown>)}
-              </section>
+              section.id === selectedSection.id && (
+                <section key={section.id} id={`${chapter.id}-${section.id}`} className="scroll-mt-6">
+                  <p className="not-prose mb-4 flex flex-wrap items-center gap-2 font-sans text-xs">
+                    <span className="inline-flex min-h-8 items-center bg-blue-700 px-3 font-semibold tabular-nums text-white dark:bg-blue-300 dark:text-blue-950">
+                      Section {pos + 1}.{index + 1}
+                    </span>
+                    <span className="text-zinc-500 dark:text-zinc-400">{chapter.title}</span>
+                  </p>
+                  <h2 data-section-heading={section.id} className="mt-0 text-2xl leading-tight md:text-3xl">
+                    {section.title}
+                  </h2>
+                  {splitChapterVideo(
+                    section.contentMd,
+                    chapter.contentMd.includes(CHAPTER_VIDEO_MARKER) || index === 0 ? chapter.videoUrl : ""
+                  ).map((block) => block.kind === "video"
+                    ? <ChapterVideo key={block.key} url={chapter.videoUrl!} title={chapter.title} />
+                    : <ReactMarkdown key={block.key} remarkPlugins={[remarkGfm]}>{block.content}</ReactMarkdown>)}
+                </section>
+              )
             ))}
           </article>
 
+          <nav aria-label="Subsection navigation" className={`mx-auto mt-10 flex w-full max-w-6xl items-center justify-between gap-4 border-y ${soft} py-4 font-sans`}>
+            <button
+              type="button"
+              disabled={pos === 0 && selectedSectionIndex === 0}
+              onClick={() => moveSubsection(-1)}
+              className={`${line} px-4 py-2 text-sm disabled:border-zinc-300 disabled:text-zinc-400 dark:disabled:border-zinc-800 dark:disabled:text-zinc-600 ${focus}`}
+            >
+              Previous
+            </button>
+            <span className="text-xs tabular-nums text-zinc-500">
+              {pos + 1}.{selectedSectionIndex + 1} <span aria-hidden="true">/</span> {pos + 1}.{chapterSections.length}
+            </span>
+            <button
+              type="button"
+              disabled={selectedSectionIndex === chapterSections.length - 1 && (pos === chapters.length - 1 || !isChapterUnlocked(pos + 1))}
+              onClick={() => moveSubsection(1)}
+              className={`${inverted} border border-black px-4 py-2 text-sm disabled:opacity-30 dark:border-white ${focus}`}
+            >
+              {selectedSectionIndex < chapterSections.length - 1 ? "Next subsection" : pos < chapters.length - 1 ? "Next chapter" : "Course complete"}
+            </button>
+          </nav>
+
           {progressError && (
-            <p role="status" className="mx-auto mt-4 flex max-w-[68ch] items-center gap-3 text-sm text-red-700 dark:text-red-300">
+            <p role="status" className="mx-auto mt-4 flex w-full max-w-6xl items-center gap-3 text-sm text-red-700 dark:text-red-300">
               Reading progress could not be synced.
-              <button type="button" onClick={retrySectionProgress} className="font-semibold underline underline-offset-4">
-                Retry
+              <button type="button" onClick={() => void retrySectionProgress()} disabled={retryingProgress} aria-busy={retryingProgress} className="inline-flex items-center gap-2 font-semibold underline underline-offset-4 disabled:cursor-wait">
+                {retryingProgress && <LoadingSpinner />}
+                {retryingProgress ? "Retrying..." : "Retry"}
               </button>
             </p>
           )}
 
-          {chapter.quiz.length > 0 && (
-            <section className={`mx-auto mt-14 flex max-w-[68ch] flex-col gap-5 border-y ${soft} py-6 font-sans sm:flex-row sm:items-center sm:justify-between`}>
+          {selectedSectionIndex === chapterSections.length - 1 && chapter.quiz.length > 0 && (
+            <section className={`mx-auto mt-14 flex w-full max-w-6xl flex-col gap-5 border-y ${soft} py-6 font-sans sm:flex-row sm:items-center sm:justify-between`}>
               <div>
                 <h2 className="text-lg font-semibold">Check your understanding</h2>
                 <p className="mt-1 text-sm text-zinc-500">{chapter.quiz.length} questions</p>
@@ -354,7 +413,7 @@ export default function ChapterReader({ courseId, courseTitle, studentName, stud
             </section>
           )}
 
-          {pos === chapters.length - 1 && finalAssessment && (
+          {selectedSectionIndex === chapterSections.length - 1 && pos === chapters.length - 1 && finalAssessment && (
             <FinalAssessmentExam
               key={courseId}
               courseId={courseId}
@@ -363,22 +422,7 @@ export default function ChapterReader({ courseId, courseTitle, studentName, stud
             />
           )}
 
-          <div className="mx-auto mt-14 flex max-w-[68ch] justify-between gap-3 pb-24 font-sans text-sm">
-            <button
-              disabled={pos === 0}
-              onClick={() => go(chapters[pos - 1].id)}
-              className={`${line} px-4 py-2 disabled:border-zinc-300 disabled:text-zinc-400 dark:disabled:border-zinc-800 dark:disabled:text-zinc-600 ${focus}`}
-            >
-              Previous chapter
-            </button>
-            <button
-              disabled={pos === chapters.length - 1 || !isChapterUnlocked(pos + 1)}
-              onClick={() => go(chapters[pos + 1].id)}
-              className={`${inverted} border border-black px-4 py-2 disabled:opacity-30 dark:border-white ${focus}`}
-            >
-              Next chapter
-            </button>
-          </div>
+          <div className="pb-24" />
         </main>
       </div>
 
@@ -581,7 +625,8 @@ function FinalAssessmentExam({
 
             {error && <p role="alert" className="border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">{error}</p>}
             <div className="flex justify-end border-t border-zinc-300 pt-5 dark:border-zinc-800">
-              <button type="submit" disabled={!isComplete || busy} className={`${inverted} border border-black px-5 py-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40 dark:border-white`}>
+              <button type="submit" disabled={!isComplete || busy} aria-busy={busy} className={`inline-flex items-center gap-2 ${inverted} border border-black px-5 py-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40 dark:border-white`}>
+                {busy && <LoadingSpinner />}
                 {busy ? "Submitting assessment..." : "Submit final assessment"}
               </button>
             </div>
@@ -599,13 +644,14 @@ function Quiz({
   onComplete,
 }: {
   questions: Question[];
-  onComplete: (score: number, total: number, answers: number[]) => void;
+  onComplete: (score: number, total: number, answers: number[]) => Promise<void>;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [open, setOpen] = useState(false);
   const [answers, setAnswers] = useState<(number | null)[]>(() => questions.map(() => null));
   const [questionIndex, setQuestionIndex] = useState(0);
   const [complete, setComplete] = useState(false);
+  const [saving, setSaving] = useState(false);
   const score = answers.reduce<number>((s, a, i) => s + (a === questions[i].correctIndex ? 1 : 0), 0);
   const percentage = Math.round((score / questions.length) * 100);
   const currentQuestion = questions[questionIndex];
@@ -622,12 +668,19 @@ function Quiz({
     setAnswers(questions.map(() => null));
     setQuestionIndex(0);
     setComplete(false);
+    setSaving(false);
   };
 
-  const advance = () => {
+  const advance = async () => {
+    if (saving) return;
     if (questionIndex === questions.length - 1) {
-      setComplete(true);
-      onComplete(score, questions.length, answers as number[]);
+      setSaving(true);
+      try {
+        await onComplete(score, questions.length, answers as number[]);
+        setComplete(true);
+      } finally {
+        setSaving(false);
+      }
       return;
     }
     setQuestionIndex((index) => index + 1);
@@ -713,11 +766,13 @@ function Quiz({
               </button>
               <button
                 type="button"
-                disabled={selected === null}
-                onClick={advance}
-                className={`${inverted} border border-black px-4 py-2 text-sm font-medium disabled:opacity-30 dark:border-white ${focus}`}
+                disabled={selected === null || saving}
+                aria-busy={saving}
+                onClick={() => void advance()}
+                className={`inline-flex items-center gap-2 ${inverted} border border-black px-4 py-2 text-sm font-medium disabled:opacity-30 dark:border-white ${focus}`}
               >
-                {questionIndex === questions.length - 1 ? "Finish quiz" : "Next question"}
+                {saving && <LoadingSpinner />}
+                {saving ? "Saving progress..." : questionIndex === questions.length - 1 ? "Finish quiz" : "Next question"}
               </button>
             </div>
           </>
@@ -776,6 +831,7 @@ function AssistantDrawer({ chapterId, chapterTitle, studentName, studentAvatar }
   const [msgs, setMsgs] = useState<Msg[]>([{ role: "assistant", content: welcomeMessage }]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [activePrompt, setActivePrompt] = useState<string | null>(null);
   const [error, setError] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
   const showStarterPrompts = msgs.length === 1 && msgs[0].role === "assistant";
@@ -819,7 +875,12 @@ function AssistantDrawer({ chapterId, chapterTitle, studentName, studentAvatar }
     const question = text.trim();
     if (!question || busy) return;
     setInput("");
-    await requestAnswer([...msgs, { role: "user", content: question }]);
+    setActivePrompt(question);
+    try {
+      await requestAnswer([...msgs, { role: "user", content: question }]);
+    } finally {
+      setActivePrompt(null);
+    }
   }
 
   async function send(e: React.FormEvent) {
@@ -898,9 +959,11 @@ function AssistantDrawer({ chapterId, chapterTitle, studentName, studentAvatar }
                   key={prompt}
                   type="button"
                   disabled={busy}
+                  aria-busy={activePrompt === prompt}
                   onClick={() => void ask(prompt)}
-                  className={`w-fit max-w-full ${soft} px-3 py-2.5 text-left text-sm hover:bg-zinc-100 disabled:opacity-50 dark:hover:bg-zinc-900 ${focus}`}
+                  className={`inline-flex w-fit max-w-full items-center gap-2 ${soft} px-3 py-2.5 text-left text-sm hover:bg-zinc-100 disabled:opacity-50 dark:hover:bg-zinc-900 ${focus}`}
                 >
+                  {activePrompt === prompt && <LoadingSpinner />}
                   {prompt}
                 </button>
               ))}
@@ -912,9 +975,12 @@ function AssistantDrawer({ chapterId, chapterTitle, studentName, studentAvatar }
               <button
                 type="button"
                 onClick={() => void requestAnswer(msgs)}
-                className={`${line} shrink-0 px-3 py-1.5 text-sm ${focus}`}
+                disabled={busy}
+                aria-busy={busy}
+                className={`inline-flex shrink-0 items-center gap-2 ${line} px-3 py-1.5 text-sm disabled:cursor-wait ${focus}`}
               >
-                Retry
+                {busy && <LoadingSpinner />}
+                {busy ? "Retrying..." : "Retry"}
               </button>
             </div>
           )}
@@ -941,8 +1007,10 @@ function AssistantDrawer({ chapterId, chapterTitle, studentName, studentAvatar }
             <button
               type="submit"
               disabled={busy || !input.trim()}
-              className="inline-flex h-11 min-w-20 shrink-0 items-center justify-center rounded-xl border border-blue-700 bg-blue-700 px-4 text-sm font-semibold text-white hover:border-blue-800 hover:bg-blue-800 disabled:cursor-not-allowed disabled:border-blue-200 disabled:bg-blue-100 disabled:text-blue-800 dark:border-blue-500 dark:bg-blue-600 dark:hover:border-blue-400 dark:hover:bg-blue-500 dark:disabled:border-blue-900 dark:disabled:bg-blue-950 dark:disabled:text-blue-200"
+              aria-busy={busy}
+              className="inline-flex h-11 min-w-20 shrink-0 items-center justify-center gap-2 rounded-xl border border-blue-700 bg-blue-700 px-4 text-sm font-semibold text-white hover:border-blue-800 hover:bg-blue-800 disabled:cursor-not-allowed disabled:border-blue-200 disabled:bg-blue-100 disabled:text-blue-800 dark:border-blue-500 dark:bg-blue-600 dark:hover:border-blue-400 dark:hover:bg-blue-500 dark:disabled:border-blue-900 dark:disabled:bg-blue-950 dark:disabled:text-blue-200"
             >
+              {busy && <LoadingSpinner />}
               {busy ? "Sending" : "Send"}
             </button>
           </div>

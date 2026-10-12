@@ -5,6 +5,8 @@ const UserProfileSchema = new Schema(
     userId: { type: String, required: true, unique: true, index: true },
     displayName: { type: String, required: true, trim: true },
     studentId: { type: String, default: "", trim: true },
+    department: { type: String, default: "", trim: true },
+    // Kept temporarily to migrate existing profile values into department.
     program: { type: String, default: "", trim: true },
     level: { type: String, default: "", trim: true },
     bio: { type: String, default: "", trim: true },

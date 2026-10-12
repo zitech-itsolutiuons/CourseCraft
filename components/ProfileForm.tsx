@@ -2,15 +2,17 @@
 
 import { useEffect, useRef, useState, type FormEvent, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
+import LoadingSpinner from "@/components/ui/LoadingSpinner";
 
 type ProfileFormProps = {
   displayName: string;
   email: string;
   studentId: string;
-  program: string;
+  department: string;
   level: string;
   bio: string;
   avatarData: string;
+  redirectAfterSave?: string;
 };
 
 const field = "mt-2 block min-h-11 w-full border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600";
@@ -21,6 +23,8 @@ export default function ProfileForm(profile: ProfileFormProps) {
   const [preview, setPreview] = useState(profile.avatarData);
   const [removeAvatar, setRemoveAvatar] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [continuing, setContinuing] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -34,6 +38,7 @@ export default function ProfileForm(profile: ProfileFormProps) {
     if (!file) return;
     setPreview(URL.createObjectURL(file));
     setRemoveAvatar(false);
+    setSaved(false);
     setMessage("");
     setError("");
   }
@@ -42,6 +47,7 @@ export default function ProfileForm(profile: ProfileFormProps) {
     if (fileInput.current) fileInput.current.value = "";
     setPreview("");
     setRemoveAvatar(true);
+    setSaved(false);
     setMessage("");
   }
 
@@ -58,7 +64,8 @@ export default function ProfileForm(profile: ProfileFormProps) {
       const response = await fetch("/api/profile", { method: "PUT", body });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error ?? "Could not save your profile");
-      setMessage("Profile saved.");
+      setMessage("Your profile was saved successfully.");
+      setSaved(true);
       setRemoveAvatar(false);
       router.refresh();
     } catch (err) {
@@ -71,7 +78,16 @@ export default function ProfileForm(profile: ProfileFormProps) {
   const initials = profile.displayName.trim().slice(0, 1).toUpperCase() || profile.email.slice(0, 1).toUpperCase();
 
   return (
-    <form onSubmit={saveProfile} className="space-y-9">
+    <form
+      onSubmit={saveProfile}
+      onChange={() => {
+        if (saved) {
+          setSaved(false);
+          setMessage("");
+        }
+      }}
+      className="space-y-9"
+    >
       <section className="grid gap-4 border-b border-slate-200 pb-8 sm:grid-cols-[12rem_minmax(0,1fr)] sm:gap-8">
         <div>
           <h2 className="text-sm font-semibold text-slate-900">Profile photo</h2>
@@ -113,18 +129,19 @@ export default function ProfileForm(profile: ProfileFormProps) {
             <input value={profile.email} readOnly className={`${field} bg-slate-50 text-slate-500`} />
           </label>
           <label className="text-sm font-medium text-slate-700">
-            Student ID <span className="font-normal text-slate-500">(optional)</span>
-            <input name="studentId" maxLength={40} defaultValue={profile.studentId} autoComplete="off" className={field} />
+            Student ID
+            <input value={profile.studentId} readOnly aria-describedby="student-id-help" className={`${field} bg-slate-50 text-slate-600`} />
+            <span id="student-id-help" className="mt-1 block text-xs font-normal text-slate-500">Assigned by Course Craft and cannot be changed.</span>
           </label>
           <label className="text-sm font-medium text-slate-700">
-            Program <span className="font-normal text-slate-500">(optional)</span>
-            <input name="program" maxLength={120} defaultValue={profile.program} placeholder="e.g. Cybersecurity" className={field} />
+            Department
+            <input name="department" required maxLength={120} defaultValue={profile.department} placeholder="e.g. Cybersecurity" className={field} />
           </label>
-          <label className="text-sm font-medium text-slate-700 sm:col-span-2">
-            Level <span className="font-normal text-slate-500">(optional)</span>
-            <input name="level" maxLength={40} defaultValue={profile.level} placeholder="e.g. 200 level" className={field} />
+          <label className="text-sm font-medium text-slate-700">
+            Level
+            <input name="level" required maxLength={40} defaultValue={profile.level} placeholder="e.g. 200 level" className={field} />
           </label>
-          <label className="text-sm font-medium text-slate-700 sm:col-span-2">
+          <label className="text-sm font-medium text-slate-700">
             About you <span className="font-normal text-slate-500">(optional)</span>
             <textarea name="bio" rows={4} maxLength={500} defaultValue={profile.bio} className={`${field} min-h-28 resize-y`} />
           </label>
@@ -134,8 +151,27 @@ export default function ProfileForm(profile: ProfileFormProps) {
       {error && <p role="alert" className="border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">{error}</p>}
       {message && <p role="status" className="border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{message}</p>}
       <div className="flex items-center justify-end gap-4">
-        <button type="submit" disabled={busy} className="min-h-11 border border-blue-700 bg-blue-700 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">
-          {busy ? "Saving…" : "Save profile"}
+        {saved && profile.redirectAfterSave && (
+          <button
+            type="button"
+            disabled={continuing}
+            aria-busy={continuing}
+            onClick={() => {
+              setContinuing(true);
+              if (profile.redirectAfterSave) {
+                router.replace(profile.redirectAfterSave);
+                router.refresh();
+              }
+            }}
+            className="inline-flex min-h-11 items-center justify-center gap-2 border border-blue-700 bg-blue-700 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-wait disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
+          >
+            {continuing && <LoadingSpinner />}
+            Continue
+          </button>
+        )}
+        <button type="submit" disabled={busy} aria-busy={busy} className="inline-flex min-h-11 items-center justify-center gap-2 border border-blue-700 bg-blue-700 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">
+          {busy && <LoadingSpinner />}
+          {busy ? "Saving…" : saved ? "Save changes" : "Save profile"}
         </button>
       </div>
     </form>

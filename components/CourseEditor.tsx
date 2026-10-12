@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { CHAPTER_VIDEO_MARKER, resolveChapterVideo, splitChapterVideo } from "@/lib/chapterVideo";
@@ -133,7 +134,7 @@ export default function CourseEditor({
     });
 
   const move = (i: number, dir: -1 | 1) =>
-    run("move", async () => {
+    run(`move-${i}-${dir === -1 ? "up" : "down"}`, async () => {
       const order = saved.map((c) => c.id);
       [order[i], order[i + dir]] = [order[i + dir], order[i]];
       await api(`/api/courses/${courseId}/chapters`, "PUT", { order });
@@ -190,7 +191,10 @@ export default function CourseEditor({
             <h2 id="details-h" className="text-sm font-semibold">Course details</h2>
             <input aria-label="Course title" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} className={field} />
             <textarea aria-label="Course description" value={description} onChange={(e) => setDescription(e.target.value)} rows={3} maxLength={1000} className={field} />
-            <button type="button" onClick={saveDetails} disabled={busy !== null} className={btn}>Save details</button>
+            <button type="button" onClick={saveDetails} disabled={busy !== null} aria-busy={busy === "details"} className={`inline-flex items-center gap-2 ${btn}`}>
+              {busy === "details" && <LoadingSpinner />}
+              {busy === "details" ? "Saving details..." : "Save details"}
+            </button>
           </section>
 
           <section aria-labelledby="chapters-h">
@@ -208,13 +212,20 @@ export default function CourseEditor({
                     {isDirty(c.id) && <span className="text-xs opacity-70">Unsaved changes</span>}
                   </button>
                   <div className="flex flex-col border-0 border-l border-zinc-300 dark:border-zinc-800">
-                    <button type="button" disabled={i === 0 || busy !== null} onClick={() => move(i, -1)} aria-label={`Move chapter ${i + 1} up`} className="px-2 text-xs hover:bg-zinc-100 disabled:opacity-30 dark:hover:bg-zinc-900">▲</button>
-                    <button type="button" disabled={i === saved.length - 1 || busy !== null} onClick={() => move(i, 1)} aria-label={`Move chapter ${i + 1} down`} className="px-2 text-xs hover:bg-zinc-100 disabled:opacity-30 dark:hover:bg-zinc-900">▼</button>
+                    <button type="button" disabled={i === 0 || busy !== null} onClick={() => move(i, -1)} aria-label={`Move chapter ${i + 1} up`} aria-busy={busy === `move-${i}-up`} className="inline-flex min-h-8 min-w-8 items-center justify-center px-2 text-xs hover:bg-zinc-100 disabled:opacity-30 dark:hover:bg-zinc-900">
+                      {busy === `move-${i}-up` ? <LoadingSpinner /> : "▲"}
+                    </button>
+                    <button type="button" disabled={i === saved.length - 1 || busy !== null} onClick={() => move(i, 1)} aria-label={`Move chapter ${i + 1} down`} aria-busy={busy === `move-${i}-down`} className="inline-flex min-h-8 min-w-8 items-center justify-center px-2 text-xs hover:bg-zinc-100 disabled:opacity-30 dark:hover:bg-zinc-900">
+                      {busy === `move-${i}-down` ? <LoadingSpinner /> : "▼"}
+                    </button>
                   </div>
                 </li>
               ))}
             </ol>
-            <button type="button" onClick={addChapter} disabled={busy !== null} className={`${btn} mt-3`}>Add chapter</button>
+            <button type="button" onClick={addChapter} disabled={busy !== null} aria-busy={busy === "add"} className={`mt-3 inline-flex items-center gap-2 ${btn}`}>
+              {busy === "add" && <LoadingSpinner />}
+              {busy === "add" ? "Adding chapter..." : "Add chapter"}
+            </button>
           </section>
         </aside>
 
@@ -224,10 +235,14 @@ export default function CourseEditor({
               <label htmlFor="ch-title" className="text-sm font-medium">Chapter title</label>
               <input id="ch-title" value={cur.title} onChange={(e) => change({ title: e.target.value })} maxLength={200} className={`${field} mt-1`} />
             </div>
-            <button type="button" onClick={saveChapter} disabled={busy !== null || !isDirty(sel)} className={solid}>
-              {busy === "save" ? "Saving" : "Save changes"}
+            <button type="button" onClick={saveChapter} disabled={busy !== null || !isDirty(sel)} aria-busy={busy === "save"} className={`inline-flex items-center gap-2 ${solid}`}>
+              {busy === "save" && <LoadingSpinner />}
+              {busy === "save" ? "Saving..." : "Save changes"}
             </button>
-            <button type="button" onClick={() => removeChapter(sel)} disabled={busy !== null || saved.length <= 1} className={btn}>Delete chapter</button>
+            <button type="button" onClick={() => removeChapter(sel)} disabled={busy !== null || saved.length <= 1} aria-busy={busy === "delete"} className={`inline-flex items-center gap-2 ${btn}`}>
+              {busy === "delete" && <LoadingSpinner />}
+              {busy === "delete" ? "Deleting chapter..." : "Delete chapter"}
+            </button>
           </div>
 
           <section className={`${soft} space-y-4 p-4`} aria-labelledby="final-assessment-heading">
@@ -241,7 +256,8 @@ export default function CourseEditor({
                   </p>
                 )}
               </div>
-              <button type="button" onClick={generateFinalAssessment} disabled={busy !== null} className={`${btn} shrink-0`}>
+              <button type="button" onClick={generateFinalAssessment} disabled={busy !== null} aria-busy={busy === "final-assessment"} className={`inline-flex shrink-0 items-center gap-2 ${btn}`}>
+                {busy === "final-assessment" && <LoadingSpinner />}
                 {busy === "final-assessment" ? "Generating assessment..." : finalAssessment ? "Regenerate final assessment" : "Generate final assessment"}
               </button>
             </div>
@@ -313,8 +329,14 @@ export default function CourseEditor({
             <label htmlFor="guidance" className="text-sm font-medium">Regenerate with the model</label>
             <input id="guidance" value={guidance} onChange={(e) => setGuidance(e.target.value)} maxLength={300} placeholder="Optional guidance, e.g. more worked examples, simpler wording" className={field} />
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => regenerate("lecture")} disabled={busy !== null} className={btn}>{busy === "lecture" ? "Writing lecture" : "Regenerate lecture"}</button>
-              <button type="button" onClick={() => regenerate("quiz")} disabled={busy !== null} className={btn}>{busy === "quiz" ? "Writing quiz" : "Regenerate quiz from this lecture"}</button>
+              <button type="button" onClick={() => regenerate("lecture")} disabled={busy !== null} aria-busy={busy === "lecture"} className={`inline-flex items-center gap-2 ${btn}`}>
+                {busy === "lecture" && <LoadingSpinner />}
+                {busy === "lecture" ? "Writing lecture..." : "Regenerate lecture"}
+              </button>
+              <button type="button" onClick={() => regenerate("quiz")} disabled={busy !== null} aria-busy={busy === "quiz"} className={`inline-flex items-center gap-2 ${btn}`}>
+                {busy === "quiz" && <LoadingSpinner />}
+                {busy === "quiz" ? "Writing quiz..." : "Regenerate quiz from this lecture"}
+              </button>
             </div>
             <p className="text-xs text-zinc-500">The result appears here as an unsaved draft. Your saved version stays untouched until you save.</p>
           </div>
@@ -370,7 +392,10 @@ export default function CourseEditor({
       <section className={`${soft} p-5`}>
         <h2 className="text-sm font-semibold">Delete course</h2>
         <p className="mt-1 text-sm text-zinc-500">Removes the course, every chapter and quiz, and all student progress.</p>
-        <button type="button" onClick={deleteCourse} disabled={busy !== null} className={`${btn} mt-3`}>Delete this course</button>
+        <button type="button" onClick={deleteCourse} disabled={busy !== null} aria-busy={busy === "course"} className={`mt-3 inline-flex items-center gap-2 ${btn}`}>
+          {busy === "course" && <LoadingSpinner />}
+          {busy === "course" ? "Deleting course..." : "Delete this course"}
+        </button>
       </section>
     </div>
   );

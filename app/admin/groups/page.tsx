@@ -1,6 +1,7 @@
 import { connectDB } from "@/lib/db";
 import { Course, CourseGroup, CourseGroupSettings } from "@/lib/models/Course";
 import GroupCodeInput from "@/components/admin/GroupCodeInput";
+import PendingSubmitButton from "@/components/ui/PendingSubmitButton";
 import { createCourseGroup, setCourseGroupCodesEnabled, setCourseGroupEnabled } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -43,13 +44,13 @@ export default async function AdminGroupsPage({ searchParams }: { searchParams: 
           </div>
           <form action={setCourseGroupCodesEnabled}>
             <input type="hidden" name="enabled" value={String(!featureEnabled)} />
-            <button
-              type="submit"
+            <PendingSubmitButton
+              pendingLabel={featureEnabled ? "Turning off..." : "Turning on..."}
               aria-pressed={featureEnabled}
               className={`min-h-10 border px-4 py-2 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${featureEnabled ? "border-rose-200 text-rose-800 hover:bg-rose-50" : "border-blue-700 bg-blue-700 text-white hover:bg-blue-800"}`}
             >
               {featureEnabled ? "Turn off group codes" : "Turn on group codes"}
-            </button>
+            </PendingSubmitButton>
           </form>
         </div>
         <p className={`mt-4 text-sm font-medium ${featureEnabled ? "text-emerald-700" : "text-slate-500"}`}>
@@ -84,13 +85,13 @@ export default async function AdminGroupsPage({ searchParams }: { searchParams: 
               </div>
             )}
           </fieldset>
-          <button
-            type="submit"
+          <PendingSubmitButton
+            pendingLabel="Creating..."
             disabled={courses.length === 0}
             className="min-h-10 border border-blue-700 bg-blue-700 px-4 py-2 text-sm font-medium text-white hover:bg-blue-800 disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
           >
             Create group code
-          </button>
+          </PendingSubmitButton>
         </form>
       </section>
 
@@ -124,9 +125,9 @@ export default async function AdminGroupsPage({ searchParams }: { searchParams: 
                 <form action={setCourseGroupEnabled}>
                   <input type="hidden" name="groupId" value={String(group._id)} />
                   <input type="hidden" name="enabled" value={String(!group.enabled)} />
-                  <button type="submit" className="min-h-10 border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
+                  <PendingSubmitButton pendingLabel={group.enabled ? "Disabling..." : "Enabling..."} className="min-h-10 border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
                     {group.enabled ? "Disable code" : "Enable code"}
-                  </button>
+                  </PendingSubmitButton>
                 </form>
               </li>
             ))}

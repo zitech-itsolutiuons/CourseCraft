@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import LoadingSpinner from "@/components/ui/LoadingSpinner";
 
 type CourseOption = { id: string; title: string };
 type QuestionType = "objective" | "theory";
@@ -191,8 +192,10 @@ export default function AssessmentBuilder({ courses }: { courses: CourseOption[]
           <button
             type="submit"
             disabled={!courseId || isGenerating}
+            aria-busy={isGenerating}
             className="inline-flex min-h-12 w-full items-center justify-center bg-blue-700 px-6 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 sm:w-auto"
           >
+            {isGenerating && <LoadingSpinner />}
             {isGenerating ? "Building your questions..." : "Generate assessment"}
           </button>
           {isGenerating && <p role="status" aria-live="polite" className="text-sm text-slate-600 dark:text-slate-300">Reviewing the course material and creating your practice questions. This may take a moment.</p>}
@@ -385,7 +388,8 @@ export default function AssessmentBuilder({ courses }: { courses: CourseOption[]
           </div>
           {error && <p role="alert" className="mt-5 border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">{error}</p>}
           <div className="mt-6 flex flex-col items-start gap-3 sm:flex-row sm:items-center">
-            <button type="button" onClick={submit} disabled={isSubmitting || answers.some((answer) => answer === undefined || answer === "")} className="inline-flex min-h-12 w-full items-center justify-center bg-blue-700 px-6 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 sm:w-auto">
+            <button type="button" onClick={submit} disabled={isSubmitting || answers.some((answer) => answer === undefined || answer === "")} aria-busy={isSubmitting} className="inline-flex min-h-12 w-full items-center justify-center gap-2 bg-blue-700 px-6 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 sm:w-auto">
+              {isSubmitting && <LoadingSpinner />}
               {isSubmitting ? "Scoring your answers..." : "Submit assessment"}
             </button>
             {isSubmitting && <p role="status" aria-live="polite" className="text-sm text-slate-600 dark:text-slate-300">Checking your answers and preparing feedback.</p>}

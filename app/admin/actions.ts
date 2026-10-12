@@ -12,7 +12,7 @@ import { encryptSignupCode, hashSignupCode } from "@/lib/signupCodes";
 import { HomepageContentInput, NewCatalogCourse } from "@/lib/validation";
 import { revalidatePath } from "next/cache";
 
-export type SignupCodeActionState = { error?: string; success?: string };
+export type SignupCodeActionState = { error?: string; success?: string; savedPriceNgn?: number };
 
 async function requireAdmin() {
   const userId = await getUserId();
@@ -51,6 +51,71 @@ export async function saveStudentQuizQuestionLimitAction(_prev: SignupCodeAction
   revalidatePath("/admin/settings");
   revalidatePath("/courses/[id]", "page");
   return { success: "Student quiz limit saved." };
+}
+
+export async function saveCourseSummarizationAction(_prev: SignupCodeActionState, formData: FormData): Promise<SignupCodeActionState> {
+  const userId = await requireAdmin();
+  await connectDB();
+  await PlatformSettings.findOneAndUpdate(
+    { key: "platform" },
+    { $set: { courseSummarizationEnabled: formData.get("courseSummarizationEnabled") === "on", updatedBy: userId } },
+    { upsert: true, setDefaultsOnInsert: true, runValidators: true }
+  );
+  revalidatePath("/admin/settings");
+  revalidatePath("/courses/[id]", "page");
+  return { success: "Course summarization setting saved." };
+}
+
+export async function saveReconstructionPriceAction(_prev: SignupCodeActionState, formData: FormData): Promise<SignupCodeActionState> {
+  const userId = await requireAdmin();
+  const rawPrice = formData.get("reconstructionPriceNgn");
+  if (typeof rawPrice !== "string" || rawPrice.trim() === "") {
+    return { error: "Enter a whole-number NGN price. Use 0 to disable checkout." };
+  }
+  const price = Number(rawPrice);
+  if (!Number.isSafeInteger(price) || price < 0 || price > Math.floor(Number.MAX_SAFE_INTEGER / 100)) {
+    return { error: "Enter a whole-number NGN price of zero or more." };
+  }
+
+  try {
+    await connectDB();
+    const result = await PlatformSettings.collection.updateOne(
+      { key: "platform" },
+      {
+        $set: { reconstructionPriceNgn: price, updatedBy: userId },
+        $setOnInsert: { requireSignupCode: true, studentQuizQuestionLimit: 15 },
+      },
+      { upsert: true }
+    );
+    if (result.matchedCount === 0 && result.upsertedCount === 0 && result.modifiedCount === 0) {
+      throw new Error("MongoDB did not acknowledge the platform price update.");
+    }
+    const savedSettings = await PlatformSettings.collection.findOne(
+      { key: "platform" },
+      { projection: { reconstructionPriceNgn: 1 } }
+    );
+    if (savedSettings?.reconstructionPriceNgn !== price) {
+      throw new Error("MongoDB did not return the submitted reconstruction price after the update.");
+    }
+  } catch (error) {
+    const failure = error instanceof Error ? error : new Error("Unknown save failure");
+    const code = "code" in failure && typeof failure.code === "number" ? failure.code : undefined;
+    console.error("[saveReconstructionPriceAction] MongoDB write failed", {
+      name: failure.name,
+      code,
+      message: failure.message,
+    });
+    return { error: "MongoDB could not save the price. Check the database connection and server log, then try again." };
+  }
+
+  try {
+    revalidatePath("/admin/settings");
+    revalidatePath("/reconstruct");
+    return { success: "Reconstruction access price saved.", savedPriceNgn: price };
+  } catch (error) {
+    console.error("[saveReconstructionPriceAction] Price saved but cache revalidation failed", error);
+    return { success: "Reconstruction access price saved.", savedPriceNgn: price };
+  }
 }
 
 export async function generateSignupCodeAction(_prev: SignupCodeActionState, formData: FormData): Promise<SignupCodeActionState> {
